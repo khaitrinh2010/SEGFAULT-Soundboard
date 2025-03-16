@@ -61,3 +61,8 @@ void tr_insert(struct sound_seg* src_track,
             size_t destpos, size_t srcpos, size_t len) {
     return;
 }
+
+int main(void){
+  return 0;
+}
+
