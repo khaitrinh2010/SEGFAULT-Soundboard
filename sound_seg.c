@@ -43,11 +43,19 @@ void wav_save(const char* fname, int16_t* src, size_t len){
 
 // Initialize a new sound_seg object
 struct sound_seg* tr_init() {
-    return NULL;
+    struct sound_seg* seg = (struct sound_seg*)malloc(sizeof(struct sound_seg)); //Alocate heap memory
+    if (seg == NULL){
+      return NULL;
+    }
+    seg->start_pos = 0;
+    seg->length = 0;
+    seg->ptr = NULL;
+    return seg;
 }
 
 // Destroy a sound_seg object and free all allocated memory
 void tr_destroy(struct sound_seg* obj) {
+    free(obj);
     return;
 }
 
