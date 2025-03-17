@@ -5,13 +5,34 @@
 #include <string.h>
 #include <stdio.h>
 
+//NOTE: Buffer is int16
+#define OFFSET 40
+#define OFFSET_TO_AUDIO_DATA 44
 
 struct sound_seg {
     //TODO
+    // Attributes of a sound_seg (track)
+    int start_pos; //start position in the buffer
+    int length; // length of the track in the buffer
+    int16_t *ptr; //pointer to the buffer array
 };
 
 // Load a WAV file into buffer
-void wav_load(const char* filename, int16_t* dest){
+void wav_load(const char* filename, int16_t* dest){  //wav file header is discarded
+    FILE *file;
+    file = fopen(filename, "rb");
+    if (file == NULL){
+      printf("Error opening file\n");
+      return;
+    }
+    //WAV File: RIFF header, FMT sub-chunk, DATA sub-chunk
+    fseek(file, OFFSET, SEEK_SET); // Extract how many bytes in the data audio
+    uint32_t number_of_bytes;
+    fread(&number_of_bytes, sizeof(uint32_t), 1, file); //read how many number_of_bytes excluding the sample I should read
+
+    fseek(file, OFFSET_TO_AUDIO_DATA, SEEK_SET);
+    fread(dest, sizeof(int16_t), number_of_bytes / sizeof(int16_t), file); //Read the data and write to the stream
+    fclose(file);
     return;
 }
 
@@ -63,6 +84,7 @@ void tr_insert(struct sound_seg* src_track,
 }
 
 int main(void){
+  //wav_load("sound.wav", dest);
   return 0;
 }
 
