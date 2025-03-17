@@ -80,7 +80,7 @@ void wav_save(const char* fname, int16_t* src, size_t len){
     header.flength = header.dlength + OFFSET_TO_AUDIO_DATA;
     fwrite(&header, sizeof(struct wav_header), 1, file);
     fseek(file, OFFSET_TO_AUDIO_DATA, SEEK_SET);
-    fwrite(&src, sizeof(int16_t), len, file);
+    fwrite(src, sizeof(int16_t), len, file);
     fclose(file);
     return;
 }
