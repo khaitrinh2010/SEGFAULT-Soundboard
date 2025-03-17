@@ -31,7 +31,7 @@ struct wav_header {
      int16_t bits_per_sample;
      char data[4];
      int32_t dlength;
- }
+ };
 
 // Load a WAV file into buffer
 void wav_load(const char* filename, int16_t* dest){  //wav file header is discarded
