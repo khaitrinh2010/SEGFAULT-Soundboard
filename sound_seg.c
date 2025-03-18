@@ -9,6 +9,8 @@
 #define OFFSET 40
 #define OFFSET_TO_AUDIO_DATA 44
 
+//SIGNAL 11: occurs when program attempts to access memory it does not have permission to access
+
 struct sound_seg {
     //TODO
     // Attributes of a sound_seg (track)
@@ -99,6 +101,7 @@ struct sound_seg* tr_init() {
 
 // Destroy a sound_seg object and free all allocated memory
 void tr_destroy(struct sound_seg* obj) {
+    free(obj->ptr);
     free(obj);
     return;
 }
