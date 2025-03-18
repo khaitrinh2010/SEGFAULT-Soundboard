@@ -12,8 +12,8 @@
 struct sound_seg {
     //TODO
     // Attributes of a sound_seg (track)
-    int start_pos; //start position in the buffer
-    int length; // length of the track in the buffer
+    size_t start_pos; //start position in the buffer
+    size_t length; // length of the track in the buffer
     int16_t *ptr; //pointer to the buffer array
 };
 
@@ -110,6 +110,16 @@ size_t tr_length(struct sound_seg* seg) {
 
 // Read len elements from position pos into dest
 void tr_read(struct sound_seg* track, int16_t* dest, size_t pos, size_t len) {
+    //copies len audio samples from position pos in the track data structure to a buffer dest, the song is 2 bytes persample
+    int start_pos_in_the_buffer = track->start_pos;
+    int end_pos_in_the_buffer = start_pos_in_the_buffer + track->length;
+    int start_in_the_buffer = start_pos_in_the_buffer + pos;
+    if (pos + len > end_pos_in_the_buffer){
+      len = track->length - pos;
+    }
+    for (size_t i = 0; i < len; i++) {
+        dest[i] = track->ptr[track->start_pos + pos + i];
+    }
     return;
 }
 
