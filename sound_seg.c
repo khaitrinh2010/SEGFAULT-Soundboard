@@ -111,9 +111,9 @@ size_t tr_length(struct sound_seg* seg) {
 // Read len elements from position pos into dest
 void tr_read(struct sound_seg* track, int16_t* dest, size_t pos, size_t len) {
     //copies len audio samples from position pos in the track data structure to a buffer dest, the song is 2 bytes persample
-    int start_pos_in_the_buffer = track->start_pos;
-    int end_pos_in_the_buffer = start_pos_in_the_buffer + track->length;
-    int start_in_the_buffer = start_pos_in_the_buffer + pos;
+    size_t start_pos_in_the_buffer = track->start_pos;
+    size_t end_pos_in_the_buffer = start_pos_in_the_buffer + track->length;
+    size_t start_in_the_buffer = start_pos_in_the_buffer + pos;
     if (pos + len > end_pos_in_the_buffer){
       len = track->length - pos;
     }
@@ -125,6 +125,15 @@ void tr_read(struct sound_seg* track, int16_t* dest, size_t pos, size_t len) {
 
 // Write len elements from src into position pos
 void tr_write(struct sound_seg* track, int16_t* src, size_t pos, size_t len) {
+    size_t start_pos_in_the_buffer = track->start_pos;
+    size_t end_pos_in_the_buffer = start_pos_in_the_buffer + track->length;
+    size_t start_in_the_buffer = start_pos_in_the_buffer + pos;
+    if (len > track->length){
+      track->length = len;
+    }
+    for (size_t i = 0; i < len; i++) {
+      track->ptr[track->start_pos + pos + i] = src[i];
+    }
     return;
 }
 
