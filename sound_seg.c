@@ -120,7 +120,7 @@ void tr_read(struct sound_seg* track, int16_t* dest, size_t pos, size_t len) {
     return;
 }
 
-// Write len elements from src into position pos
+// Write len elements from src into position pos of the track
 void tr_write(struct sound_seg* track, int16_t* src, size_t pos, size_t len) {
     if (track->ptr == NULL){
       track->ptr = (int16_t*)malloc((pos + len) * sizeof(int16_t));
@@ -136,13 +136,18 @@ void tr_write(struct sound_seg* track, int16_t* src, size_t pos, size_t len) {
     for (size_t i = 0; i < len; i++) {
       track->ptr[track->start_pos + pos + i] = src[i];
     }
+    for (size_t i = track->start_pos; i < end_pos_in_the_buffer; i++) {
+        printf("%c", track->ptr[i]);
+    }
+    printf("\n");
     return;
 }
 
 // Delete a range of elements from the track
 bool tr_delete_range(struct sound_seg* track, size_t pos, size_t len) {
-    for (size_t i = 0; i < len; i++) {
-      track->ptr[track->start_pos + pos + i] = track->ptr[track->start_pos + pos + len + i];
+    size_t start_pos_in_track = track->start_pos + pos;
+    for (size_t i = start_pos_in_track; i < track->start_pos + track->length; i++) {
+        track->ptr[i] = track->ptr[i + len];
     }
     track->length -= len;
     return true;
@@ -162,6 +167,20 @@ void tr_insert(struct sound_seg* src_track,
 
 int main(void){
   //wav_load("sound.wav", dest);
-  return 0;
+    struct sound_seg* s0 = tr_init();
+    tr_write(s0, ((int16_t[]){}), 0, 0);
+    struct sound_seg* s1 = tr_init();
+    tr_write(s1, ((int16_t[]){-5,-10,3}), 0, 3);
+    tr_write(s1, ((int16_t[]){-1,8,8}), 0, 3);
+    tr_write(s1, ((int16_t[]){12,10,9}), 0, 3);
+    tr_write(s1, ((int16_t[]){10,4,-3}), 0, 3);
+    tr_write(s1, ((int16_t[]){17,-18,-5}), 0, 3);
+    tr_delete_range(s1, 0, 1); //expect return True
+    int16_t FAILING_READ[2];
+    tr_read(s1, FAILING_READ, 0, 2);
+    //expected [-18  -5], actual [-18 -18]!
+    tr_destroy(s0);
+    tr_destroy(s1);
+    return 0;
 }
 
