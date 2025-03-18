@@ -139,9 +139,10 @@ void tr_write(struct sound_seg* track, int16_t* src, size_t pos, size_t len) {
 
 // Delete a range of elements from the track
 bool tr_delete_range(struct sound_seg* track, size_t pos, size_t len) {
+    for (size_t i = 0; i < len; i++) {
+      track->ptr[track->start_pos + pos + i] = track->ptr[track->start_pos + pos + len + i];
+    }
     track->length -= len;
-    memmove(track->ptr + pos, track->ptr + pos + len, (track->length - (pos + len)) * sizeof(int16_t));
-
     return true;
 }
 
