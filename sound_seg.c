@@ -134,7 +134,7 @@ void tr_write(struct sound_seg* track, int16_t* src, size_t pos, size_t len) {
     size_t end_pos_in_the_buffer = start_pos_in_the_buffer + track->length;
     size_t start_in_the_buffer = start_pos_in_the_buffer + pos;
     for (size_t i = 0; i < len; i++) {
-      track->ptr[pos + i] = src[i];
+      track->ptr[track->start_pos + pos + i] = src[i];
     }
     return;
 }
