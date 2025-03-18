@@ -128,14 +128,19 @@ void tr_read(struct sound_seg* track, int16_t* dest, size_t pos, size_t len) {
 
 // Write len elements from src into position pos
 void tr_write(struct sound_seg* track, int16_t* src, size_t pos, size_t len) {
+    if (track->ptr == NULL){
+      track->ptr = (int16_t*)malloc((pos + len) * sizeof(int16_t));
+      track->length = pos + len;
+    }
+    if (pos + len > track->length){
+      track->ptr = (int16_t*)realloc(track->ptr, (len + pos) * sizeof(int16_t));
+      track->length = pos + len;
+    }
     size_t start_pos_in_the_buffer = track->start_pos;
     size_t end_pos_in_the_buffer = start_pos_in_the_buffer + track->length;
     size_t start_in_the_buffer = start_pos_in_the_buffer + pos;
-    if (len > track->length){
-      track->length = len;
-    }
     for (size_t i = 0; i < len; i++) {
-      track->ptr[track->start_pos + pos + i] = src[i];
+      track->ptr[pos + i] = src[i];
     }
     return;
 }
