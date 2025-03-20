@@ -157,7 +157,6 @@ bool tr_delete_range(struct sound_seg* track, size_t pos, size_t len) {
 char* tr_identify(struct sound_seg* target, struct sound_seg* ad){
     size_t temp_size = 256;
     char* ptr = (char*)malloc(temp_size);
-
     if (ptr == NULL) {
         return NULL;
     }
@@ -198,6 +197,9 @@ char* tr_identify(struct sound_seg* target, struct sound_seg* ad){
         free(ptr);
         return strdup("");
     }
+    if (ptr[strlen(ptr) - 1] == '\n') {
+        ptr[strlen(ptr) - 1] = '\0';
+    }
     return ptr;
 }
 
@@ -208,22 +210,17 @@ void tr_insert(struct sound_seg* src_track,
     return;
 }
 
-int main(void){
-  //wav_load("sound.wav", dest);
-    struct sound_seg* s0 = tr_init();
-    tr_write(s0, ((int16_t[]){}), 0, 0);
-    struct sound_seg* s1 = tr_init();
-    tr_write(s1, ((int16_t[]){-5,-10,3}), 0, 3);
-    tr_write(s1, ((int16_t[]){-1,8,8}), 0, 3);
-    tr_write(s1, ((int16_t[]){12,10,9}), 0, 3);
-    tr_write(s1, ((int16_t[]){10,4,-3}), 0, 3);
-    tr_write(s1, ((int16_t[]){17,-18,-5}), 0, 3);
-    tr_delete_range(s1, 0, 1); //expect return True
-    int16_t FAILING_READ[2];
-    tr_read(s1, FAILING_READ, 0, 2);
-    //expected [-18  -5], actual [-18 -18]!
-    tr_destroy(s0);
-    tr_destroy(s1);
+int main() {
+    int16_t target_data[] = {1, 2, 3, 4, 5, 2, 3, 4, 6, 7, 2, 3, 4, 8, 9};
+    size_t target_length = sizeof(target_data) / sizeof(target_data[0]);
+    int16_t ad_data[] = {2, 3, 4}; // Looking for this sequence in target
+    size_t ad_length = sizeof(ad_data) / sizeof(ad_data[0]);
+    struct sound_seg target = {0, target_length, target_data};
+    struct sound_seg ad = {0, ad_length, ad_data};
+    char* result = tr_identify(&target, &ad);
+    printf("Matches found at:\n%s", result);
+    free(result);
+
     return 0;
 }
 
