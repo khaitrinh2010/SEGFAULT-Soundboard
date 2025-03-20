@@ -167,7 +167,8 @@ char* tr_identify(struct sound_seg* target, struct sound_seg* ad){
         size_t index_in_target = 0;
         int found = 1;
         for (int j = i; j < i + ad->length; j++) {
-            if (target->ptr[j] == ad->ptr[index_in_target++]) {
+            if (target->ptr[j] == ad->ptr[index_in_target]) {
+                index_in_target++;
                 continue;
             }
             else {
