@@ -152,6 +152,19 @@ bool tr_delete_range(struct sound_seg* track, size_t pos, size_t len) {
     track->length -= len;
     return true;
 }
+double compute_cross_relation(int16_t *array1 , int16_t *array2 , size_t len) {
+    double sum1 = 0;
+    double sum2 = 0;
+    int16_t *ptr1 = array1;
+    int16_t *ptr2 = array2;
+    for (size_t i = 0; i < len; i++) {
+        sum1 += (double) (*ptr1)*(*ptr2);
+        sum2 += (double) (*ptr2)*(*ptr2);
+        ptr1++;
+        ptr2++;
+    }
+    return sum1/sum2;
+}
 
 // Returns a string containing <start>,<end> ad pairs in target
 char* tr_identify(struct sound_seg* target, struct sound_seg* ad){
@@ -161,19 +174,13 @@ char* tr_identify(struct sound_seg* target, struct sound_seg* ad){
         return NULL;
     }
     ptr[0] = '\0';
+    double threshold = 0.95;
     size_t current_length = 0;
     for (int i = 0; i <= target->length - ad->length; i++) {
-        size_t index_in_target = 0;
         int found = 1;
-        for (int j = i; j < i + ad->length; j++) {
-            if (target->ptr[j] == ad->ptr[index_in_target]) {
-                index_in_target++;
-                continue;
-            }
-            else {
-                found = 0;
-                break;
-            }
+        double cross_relation = compute_cross_relation(&target->ptr[i], ad->ptr, ad->length);
+        if (cross_relation < threshold) {
+            found = 0;
         }
         if (found == 1) { //found
             size_t last_index = i + ad->length - 1;
