@@ -155,7 +155,49 @@ bool tr_delete_range(struct sound_seg* track, size_t pos, size_t len) {
 
 // Returns a string containing <start>,<end> ad pairs in target
 char* tr_identify(struct sound_seg* target, struct sound_seg* ad){
-    return NULL;
+    size_t temp_size = 256;
+    char* ptr = (char*)malloc(temp_size);
+
+    if (ptr == NULL) {
+        return NULL;
+    }
+    ptr[0] = '\0';
+    size_t current_length = 0;
+    for (int i = 0; i <= target->length - ad->length; i++) {
+        size_t index_in_target = 0;
+        int found = 1;
+        for (int j = i; j < i + ad->length; j++) {
+            if (target->ptr[j] == ad->ptr[index_in_target++]) {
+                continue;
+            }
+            else {
+                found = 0;
+                break;
+            }
+        }
+        if (found == 1) { //found
+            size_t last_index = i + ad->length - 1;
+            char temp[32];
+            snprintf(temp, sizeof(temp), "%zu,%zu\n", i, last_index);
+            size_t length = strlen(temp);
+            if (current_length + length + 1 >= temp_size) {
+                temp_size *= 2;
+                char* temp_ptr = (char*)realloc(ptr, temp_size);
+                if (!temp_ptr) {
+                    free(ptr);
+                    return NULL;
+                }
+                ptr = temp_ptr;
+            }
+            strcat(ptr, temp);
+            current_length += length;
+        }
+    }
+    if (current_length == 0) {
+        free(ptr);
+        return strdup("");
+    }
+    return ptr;
 }
 
 // Insert a portion of src_track into dest_track at position destpos
