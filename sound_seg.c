@@ -172,6 +172,7 @@ char* tr_identify(struct sound_seg* target, struct sound_seg* ad){
     if (ptr == NULL) {
         return NULL;
     }
+    ptr[0] = '\0';
     double threshold = 0.95;
     size_t current_length = 0;
     for (int i = 0; i <= target->length - ad->length; i++) {
