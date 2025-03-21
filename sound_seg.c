@@ -113,11 +113,10 @@ size_t tr_length(struct sound_seg* seg) {
 
 // Read len elements from position pos into dest
 void tr_read(struct sound_seg* track, int16_t* dest, size_t pos, size_t len) {
-    //copies len audio samples from position pos in the track data structure to a buffer dest, the song is 2 bytes persample
+    //copies len audio samples from position pos in the track data structure to a buffer dest, the song is 2 bytes per sample
     for (size_t i = 0; i < len; i++) {
         dest[i] = track->ptr[track->start_pos + pos + i];
     }
-    return;
 }
 
 // Write len elements from src into position pos of the track
@@ -173,7 +172,6 @@ char* tr_identify(struct sound_seg* target, struct sound_seg* ad){
     if (ptr == NULL) {
         return NULL;
     }
-    ptr[0] = '\0';
     double threshold = 0.95;
     size_t current_length = 0;
     for (int i = 0; i <= target->length - ad->length; i++) {
@@ -217,16 +215,17 @@ void tr_insert(struct sound_seg* src_track,
     return;
 }
 
-int main() {
-    int16_t target_data[] = {1, 2, 3, 4, 5, 2, 3, 4, 6, 7, 2, 3, 4, 8, 9};
-    size_t target_length = sizeof(target_data) / sizeof(target_data[0]);
-    int16_t ad_data[] = {2, 3, 4}; // Looking for this sequence in target
-    size_t ad_length = sizeof(ad_data) / sizeof(ad_data[0]);
-    struct sound_seg target = {0, target_length, target_data};
-    struct sound_seg ad = {0, ad_length, ad_data};
-    char* result = tr_identify(&target, &ad);
-    printf("Matches found at:\n%s", result);
-    free(result);
+int main(int argc, char** argv) {
+    // int16_t target_data[] = {1, 2, 3, 4, 5, 2, 3, 4, 6, 7, 2, 3, 4, 8, 9};
+    // size_t target_length = sizeof(target_data) / sizeof(target_data[0]);
+    // int16_t ad_data[] = {2, 3, 4}; // Looking for this sequence in target
+    // size_t ad_length = sizeof(ad_data) / sizeof(ad_data[0]);
+    // struct sound_seg target = {0, target_length, target_data};
+    // struct sound_seg ad = {0, ad_length, ad_data};
+    // char* result = tr_identify(&target, &ad);
+    // printf("Matches found at:\n%s", result);
+    // free(result);
+    printf("%s\n", *(argv + 1));
 
     return 0;
 }
