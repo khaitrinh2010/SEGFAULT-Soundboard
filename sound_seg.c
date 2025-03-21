@@ -201,7 +201,8 @@ char* tr_identify(struct sound_seg* target, struct sound_seg* ad){
     }
     if (current_length == 0) {
         free(ptr);
-        return strdup("");
+        char *str = "";
+        return str;
     }
     if (ptr[strlen(ptr) - 1] == '\n') {
         ptr[strlen(ptr) - 1] = '\0';
