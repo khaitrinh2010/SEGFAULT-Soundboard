@@ -214,6 +214,10 @@ void tr_write(struct sound_seg* track, int16_t* src, size_t pos, size_t len) {
 }
 
 bool tr_delete_range(struct sound_seg* track, size_t pos, size_t len) {
+    if (tr_length(track) < pos + len) {
+        return false;
+    }
+
     size_t skipped = 0;
     struct sound_seg_node* current = track->head;
     struct sound_seg_node* prev = NULL;
