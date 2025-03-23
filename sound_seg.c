@@ -147,72 +147,44 @@ void tr_read(struct sound_seg* track, int16_t* dest, size_t pos, size_t len) {
 }
 
 void tr_write(struct sound_seg* track, int16_t* src, size_t pos, size_t len) {
-    struct sound_seg_node *current = track->head;
-    size_t skipped_length = 0;
-    size_t prev = 0;
-    size_t index_in_src = 0;
-    size_t count_index_in_current_segment = 0;
+    size_t skipped = 0, written = 0;
+    struct sound_seg_node* cur = track->head;
 
-    // Initialize first segment if needed
-    if (current->audio_data == NULL) {
-        size_t new_size = pos + len;
-        current->audio_data = malloc(sizeof(int16_t) * new_size);
-        if (!current->audio_data) return;
-        for (size_t i = 0; i < new_size; i++) {
-            current->audio_data[i] = 0;
-        }
-        current->length_of_the_segment = new_size;
-    }
-
-    while (current != NULL) {
-        size_t current_length = current->length_of_the_segment;
-
-        if (skipped_length + current_length <= pos && track->total_number_of_segments > 1) {
-            skipped_length += current_length;
-            current = current->next;
+    while (cur && written < len) {
+        size_t seg_len = cur->length_of_the_segment;
+        size_t seg_start = skipped;
+        size_t seg_end = seg_start + seg_len;
+        if (seg_end <= pos) {
+            skipped = seg_end;
+            cur = cur->next;
             continue;
         }
-        size_t offset = 0;
-        if (pos > skipped_length) {
-            offset = pos - skipped_length;
-        }
-        int16_t *first_ptr = current->audio_data + offset;
-        size_t available = current_length - offset;
-        size_t remaining = len - prev;
-        size_t to_write = (available < remaining) ? available : remaining;
+        size_t offset = (pos > skipped) ? (pos - skipped) : 0;
+        size_t available = seg_len > offset ? seg_len - offset : 0;
+        size_t to_write = (len - written < available) ? (len - written) : available;
         for (size_t i = 0; i < to_write; i++) {
-            first_ptr[i] = src[prev + i];
-            index_in_src++;
-            count_index_in_current_segment++;
+            cur->audio_data[offset + i] = src[written++];
         }
-        prev = index_in_src;
-        if (index_in_src < len) {
-            if (current->next == NULL) {
-                size_t new_size = pos + len;
-                int16_t *temp_ptr = (int16_t *) realloc(current->audio_data, sizeof(int16_t) * new_size);
-                if (!temp_ptr) return;
-
-                for (size_t i = current_length; i < new_size; i++) {
-                    temp_ptr[i] = 0;
-                }
-                current->audio_data = temp_ptr;
-                current->length_of_the_segment = new_size;
-                int16_t *restart_position = current->audio_data + offset + count_index_in_current_segment;
-                for (size_t i = prev; i < len; i++) {
-                    *restart_position = src[i];
-                    restart_position++;
-                }
-                return;
-            } else {
-                current = current->next;
-                skipped_length += current->length_of_the_segment;
-                count_index_in_current_segment = 0;
-            }
-        } else {
-            return;
+        skipped = seg_end;
+        cur = cur->next;
+    }
+    if (written < len) {
+        struct sound_seg_node* last = track->head;
+        while (last->next) last = last->next;
+        size_t new_len = pos + len;
+        int16_t* new_data = realloc(last->audio_data, new_len * sizeof(int16_t));
+        if (!new_data) return;
+        for (size_t i = last->length_of_the_segment; i < new_len; i++) {
+            new_data[i] = 0;  // zero padding
+        }
+        last->audio_data = new_data;
+        last->length_of_the_segment = new_len;
+        for (; written < len; written++) {
+            last->audio_data[pos + written] = src[written];
         }
     }
 }
+
 bool tr_delete_range(struct sound_seg* track, size_t pos, size_t len) {
     size_t skipped = 0;
     struct sound_seg_node* current = track->head;
