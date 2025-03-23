@@ -8,24 +8,20 @@
 //NOTE: Buffer is int16
 #define OFFSET 40
 #define OFFSET_TO_AUDIO_DATA 44
-
 struct shared_buffer {
     int16_t* data;
     size_t refcount;
 };
-
 struct sound_seg_node {
     struct sound_seg_node* next;
     struct shared_buffer* buffer;
     size_t offset;
     size_t length;
 };
-
 struct sound_seg {
     struct sound_seg_node* head;
     size_t total_number_of_segments;
 };
-
 struct wav_header {
      char riff[4];
      uint32_t flength;
@@ -128,51 +124,78 @@ void tr_destroy(struct sound_seg* track) {
 
 size_t tr_length(struct sound_seg* seg) {
     size_t total = 0;
-    for (struct sound_seg_node* n = seg->head; n; n = n->next) {
+    struct sound_seg_node* n = seg->head;
+    while (n != NULL) {
         total += n->length;
+        n = n->next;
     }
     return total;
 }
+
 void tr_read(struct sound_seg* track, int16_t* dest, size_t pos, size_t len) {
-    size_t skipped = 0, copied = 0;
-    for (struct sound_seg_node* n = track->head; n && copied < len; n = n->next) {
+    size_t skipped = 0;
+    size_t copied = 0;
+    struct sound_seg_node* n = track->head;
+    while (n != NULL && copied < len) {
         if (skipped + n->length <= pos) {
             skipped += n->length;
+            n = n->next;
             continue;
         }
-        size_t start = (pos > skipped) ? pos - skipped : 0;
-        size_t to_copy = (n->length - start < len - copied) ? n->length - start : len - copied;
-        memcpy(dest + copied, n->buffer->data + n->offset + start, to_copy * sizeof(int16_t));
-        copied += to_copy;
+        size_t start = 0;
+        if (pos > skipped) {
+            start = pos - skipped;
+        }
+        size_t to_copy = n->length - start;
+        if (to_copy > len - copied) {
+            to_copy = len - copied;
+        }
+        for (size_t i = 0; i < to_copy; i++) {
+            dest[copied] = n->buffer->data[n->offset + start + i];
+            copied++;
+        }
         skipped += n->length;
+        n = n->next;
     }
 }
 
 void tr_write(struct sound_seg* track, int16_t* src, size_t pos, size_t len) {
-    size_t skipped = 0, written = 0;
+    size_t skipped = 0;
+    size_t written = 0;
     struct sound_seg_node* last = NULL;
+    struct sound_seg_node* n = track->head;
 
-    for (struct sound_seg_node* n = track->head; n && written < len; n = n->next) {
-        size_t seg_start = skipped;
-        size_t seg_end = seg_start + n->length;
-        if (seg_end <= pos) {
+    while (n != NULL && written < len) {
+        if (skipped + n->length <= pos) {
             skipped += n->length;
             last = n;
+            n = n->next;
             continue;
         }
-        size_t offset = pos > skipped ? pos - skipped : 0;
+        size_t offset = 0;
+        if (pos > skipped) {
+            offset = pos - skipped;
+        }
         size_t writable = n->length - offset;
-        size_t to_write = (len - written < writable) ? (len - written) : writable;
-        memcpy(n->buffer->data + n->offset + offset, src + written, to_write * sizeof(int16_t));
-        written += to_write;
+        size_t to_write = len - written;
+        if (writable < to_write) {
+            to_write = writable;
+        }
+        for (size_t i = 0; i < to_write; i++) {
+            n->buffer->data[n->offset + offset + i] = src[written];
+            written++;
+        }
         skipped += n->length;
         last = n;
+        n = n->next;
     }
 
-    while (written < len) {
+    if (written < len) {
         struct shared_buffer* buf = malloc(sizeof(struct shared_buffer));
         buf->data = malloc((len - written) * sizeof(int16_t));
-        memcpy(buf->data, src + written, (len - written) * sizeof(int16_t));
+        for (size_t i = 0; i < len - written; i++) {
+            buf->data[i] = src[written + i];
+        }
         buf->refcount = 1;
 
         struct sound_seg_node* node = malloc(sizeof(struct sound_seg_node));
@@ -187,7 +210,6 @@ void tr_write(struct sound_seg* track, int16_t* src, size_t pos, size_t len) {
             last->next = node;
         }
         track->total_number_of_segments++;
-        break;
     }
 }
 
@@ -196,7 +218,7 @@ bool tr_delete_range(struct sound_seg* track, size_t pos, size_t len) {
     struct sound_seg_node* current = track->head;
     struct sound_seg_node* prev = NULL;
 
-    while (current && len > 0) {
+    while (current != NULL && len > 0) {
         size_t seg_start = skipped;
         size_t seg_end = seg_start + current->length;
 
@@ -207,27 +229,38 @@ bool tr_delete_range(struct sound_seg* track, size_t pos, size_t len) {
             continue;
         }
 
-        size_t offset = pos > skipped ? pos - skipped : 0;
+        size_t offset = 0;
+        if (pos > skipped) {
+            offset = pos - skipped;
+        }
         size_t deletable = current->length - offset;
-        size_t to_delete = (deletable > len) ? len : deletable;
+        size_t to_delete = len;
+        if (deletable < to_delete) {
+            to_delete = deletable;
+        }
 
-        if (offset + to_delete < current->length) {
-            memmove(current->buffer->data + current->offset + offset,
-                    current->buffer->data + current->offset + offset + to_delete,
-                    (current->length - offset - to_delete) * sizeof(int16_t));
+        for (size_t i = offset; i + to_delete < current->length; i++) {
+            current->buffer->data[current->offset + i] = current->buffer->data[current->offset + i + to_delete];
         }
         current->length -= to_delete;
         len -= to_delete;
         skipped = seg_start + current->length;
 
         if (current->length == 0 && current != track->head) {
-            if (prev) prev->next = current->next;
-            if (--current->buffer->refcount == 0) {
+            if (prev != NULL) {
+                prev->next = current->next;
+            }
+            current->buffer->refcount--;
+            if (current->buffer->refcount == 0) {
                 free(current->buffer->data);
                 free(current->buffer);
             }
             free(current);
-            current = (prev) ? prev->next : track->head;
+            if (prev != NULL) {
+                current = prev->next;
+            } else {
+                current = track->head;
+            }
             track->total_number_of_segments--;
         } else {
             prev = current;
