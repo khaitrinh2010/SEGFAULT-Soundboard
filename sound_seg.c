@@ -150,7 +150,6 @@ void tr_read(struct sound_seg* track, int16_t* dest, size_t pos, size_t len) {
 void tr_write(struct sound_seg* track, const int16_t* src, size_t pos, size_t len) {
     if (!track || !src || len == 0) return;
 
-    // If track is empty, create first node
     if (!track->head) {
         struct segment_node* node = malloc(sizeof(struct segment_node));
         node->data = malloc(len * sizeof(int16_t));
@@ -160,11 +159,10 @@ void tr_write(struct sound_seg* track, const int16_t* src, size_t pos, size_t le
         node->next = NULL;
         memcpy(node->data, src, len * sizeof(int16_t));
         track->head = node;
-        track->total_length = pos + len;
+        track->total_length = len;  // Fixed: just len, not pos + len
         return;
     }
 
-    // Find insertion point
     struct segment_node* prev = NULL;
     struct segment_node* current = track->head;
     size_t current_pos = 0;
@@ -175,7 +173,12 @@ void tr_write(struct sound_seg* track, const int16_t* src, size_t pos, size_t le
         current = current->next;
     }
 
-    // Create new node for the data
+    if (current && pos >= current_pos && pos + len <= current_pos + current->length) {
+        // Overwrite within existing segment
+        memcpy(current->data + (pos - current_pos), src, len * sizeof(int16_t));
+        return;  // No length change needed
+    }
+
     struct segment_node* new_node = malloc(sizeof(struct segment_node));
     new_node->data = malloc(len * sizeof(int16_t));
     new_node->length = len;
@@ -190,17 +193,22 @@ void tr_write(struct sound_seg* track, const int16_t* src, size_t pos, size_t le
         } else {
             track->head = new_node;
         }
-        track->total_length = pos + len;
-    } else {  // Insert in middle
+        if (pos + len > track->total_length) {
+            track->total_length = pos + len;  // Only extend if beyond current length
+        }
+    } else {  // Insert or extend
         size_t offset = pos - current_pos;
-        if (offset == 0) {  // Insert before current
+        if (offset == 0) {
             new_node->next = current;
             if (prev) {
                 prev->next = new_node;
             } else {
                 track->head = new_node;
             }
-        } else {  // Split current node
+            if (pos + len > track->total_length) {
+                track->total_length = pos + len;
+            }
+        } else {
             struct segment_node* tail = malloc(sizeof(struct segment_node));
             tail->data = current->data + offset;
             tail->length = current->length - offset;
@@ -211,11 +219,12 @@ void tr_write(struct sound_seg* track, const int16_t* src, size_t pos, size_t le
             current->length = offset;
             current->next = new_node;
             new_node->next = tail;
+            if (pos + len > track->total_length) {
+                track->total_length = pos + len;
+            }
         }
-        track->total_length += len;
     }
 }
-
 // Delete a range of elements from the track
 bool tr_delete_range(struct sound_seg* track, size_t pos, size_t len) {
     if (!track || !track->head || len == 0) return true;
