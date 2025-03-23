@@ -232,7 +232,6 @@ void tr_write(struct sound_seg* track, int16_t* src, size_t pos, size_t len) {
         }
     }
 }
-
 bool tr_delete_range(struct sound_seg* track, size_t pos, size_t len) {
     size_t skipped = 0;
     struct sound_seg_node* current = track->head;
@@ -369,10 +368,46 @@ char* tr_identify(const struct sound_seg* target, const struct sound_seg* ad) {
     return result;
 }
 // Insert a portion of src_track into dest_track at position destpos
-void tr_insert(struct sound_seg* src_track,
-            struct sound_seg* dest_track,
-            size_t destpos, size_t srcpos, size_t len) {
-    return;
+void tr_insert(struct sound_seg* src, struct sound_seg* dest, size_t destpos, size_t srcpos, size_t len) {
+    int16_t* temp = malloc(len * sizeof(int16_t));
+    tr_read(src, temp, srcpos, len);
+
+    size_t skipped = 0;
+    struct sound_seg_node* current = dest->head;
+    struct sound_seg_node* prev = NULL;
+
+    while (current && skipped + current->length_of_the_segment <= destpos) {
+        skipped += current->length_of_the_segment;
+        prev = current;
+        current = current->next;
+    }
+
+    size_t offset = destpos - skipped;
+
+    struct sound_seg_node* new_node = malloc(sizeof(struct sound_seg_node));
+    new_node->audio_data = malloc(sizeof(int16_t) * len);
+    memcpy(new_node->audio_data, temp, sizeof(int16_t) * len);
+    new_node->length_of_the_segment = len;
+    new_node->next = NULL;
+
+    if (current == NULL) {
+        if (prev) prev->next = new_node;
+    } else if (offset == 0) {
+        if (prev) prev->next = new_node;
+        new_node->next = current;
+    } else {
+        struct sound_seg_node* split_node = malloc(sizeof(struct sound_seg_node));
+        split_node->length_of_the_segment = current->length_of_the_segment - offset;
+        split_node->audio_data = malloc(sizeof(int16_t) * split_node->length_of_the_segment);
+        memcpy(split_node->audio_data, current->audio_data + offset, split_node->length_of_the_segment * sizeof(int16_t));
+
+        current->length_of_the_segment = offset;
+
+        new_node->next = split_node;
+        current->next = new_node;
+    }
+    dest->total_number_of_segments++;
+    free(temp);
 }
 
 int main(int argc, char** argv) {
