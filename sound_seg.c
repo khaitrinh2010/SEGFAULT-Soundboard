@@ -198,18 +198,17 @@ bool tr_delete_range(struct sound_seg* track, size_t pos, size_t len) {
             current = current->next;
             continue;
         }
-        size_t offset = pos > skipped ? pos - skipped : 0;
+        size_t offset = (pos > skipped) ? pos - skipped : 0;
         size_t deletable = current->length_of_the_segment - offset;
-        size_t to_delete = (deletable > len) ? len : deletable;
+        size_t to_delete = (len < deletable) ? len : deletable;
 
-        if (offset + to_delete < current->length_of_the_segment) {
-            memmove(current->audio_data + offset,
-                    current->audio_data + offset + to_delete,
-                    (current->length_of_the_segment - offset - to_delete) * sizeof(int16_t));
+        // Shift remaining samples manually
+        for (size_t i = offset; i + to_delete < current->length_of_the_segment; i++) {
+            current->audio_data[i] = current->audio_data[i + to_delete];
         }
         current->length_of_the_segment -= to_delete;
         len -= to_delete;
-        skipped = seg_start + current->length_of_the_segment;
+        skipped = seg_end;
         if (current->length_of_the_segment == 0 && current != track->head) {
             if (prev) prev->next = current->next;
             free(current->audio_data);
@@ -221,6 +220,7 @@ bool tr_delete_range(struct sound_seg* track, size_t pos, size_t len) {
             current = current->next;
         }
     }
+
     return true;
 }
 
