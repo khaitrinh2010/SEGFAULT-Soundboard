@@ -373,10 +373,12 @@ void tr_insert(struct sound_seg* src, struct sound_seg* dest, size_t destpos, si
     if (insert_tail) {
         insert_tail->next = curr;
     }
-    while (insert_head) {
+    struct sound_seg_node* tmp = insert_head;
+    while (tmp) {
         dest->total_number_of_segments++;
-        insert_head = insert_head->next;
+        tmp = tmp->next;
     }
+
 }
 
 
