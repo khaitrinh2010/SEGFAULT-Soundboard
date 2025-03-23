@@ -129,23 +129,17 @@ size_t tr_length(struct sound_seg* track) {
 
 void tr_read(struct sound_seg* track, int16_t* dest, size_t pos, size_t len) {
     if (!track || !track->head || !dest) return;
-
     size_t current_pos = 0;
     struct segment_node* current = track->head;
     size_t dest_idx = 0;
-
-    // Skip to starting position
     while (current && current_pos + current->length <= pos) {
         current_pos += current->length;
         current = current->next;
     }
-
-    // Copy data to dest
     while (current && dest_idx < len) {
         size_t offset = pos - current_pos;
         size_t available = current->length - offset;
         size_t to_copy = len - dest_idx < available ? len - dest_idx : available;
-
         memcpy(dest + dest_idx, current->data + offset, to_copy * sizeof(int16_t));
         dest_idx += to_copy;
         current_pos += current->length;
@@ -166,7 +160,7 @@ void tr_write(struct sound_seg* track, const int16_t* src, size_t pos, size_t le
         node->next = NULL;
         memcpy(node->data, src, len * sizeof(int16_t));
         track->head = node;
-        track->total_length = len;
+        track->total_length = pos + len;
         return;
     }
 
