@@ -9,11 +9,16 @@
 #define OFFSET 40
 #define OFFSET_TO_AUDIO_DATA 44
 
-//SIGNAL 11: occurs when program attempts to access memory it does not have permission to access
+struct shared_buffer {
+    int16_t* data;
+    size_t refcount;
+};
+
 struct sound_seg_node {
     struct sound_seg_node* next;
-    size_t length_of_the_segment;  // How many samples from this segment
-    int16_t* audio_data; //start element in the buffer
+    struct shared_buffer* buffer;
+    size_t offset;
+    size_t length;
 };
 
 struct sound_seg {
@@ -36,6 +41,16 @@ struct wav_header {
      char data[4];
      int32_t dlength;
  };
+
+double compute_cross_relation(int16_t *array1 , int16_t *array2 , size_t len) {
+    double sum1 = 0;
+    double sum2 = 0;
+    for (size_t i = 0; i < len; i++) {
+        sum1 += (double)(array1[i]) * (array2[i]);
+        sum2 += (double)(array2[i]) * (array2[i]);
+    }
+    return sum2 == 0 ? 0 : sum1 / sum2;
+}
 
 // Load a WAV file into buffer
 void wav_load(const char* filename, int16_t* dest){  //wav file header is discarded
@@ -91,175 +106,126 @@ void wav_save(const char* fname, int16_t* src, size_t len){
 
 // Initialize a new sound_seg object
 struct sound_seg* tr_init() {
-    //When init, only needs 1 segment, more segment will be added in the insertion
-    struct sound_seg_node *node = (struct sound_seg_node *)malloc(sizeof(struct sound_seg_node));
-    node->next = NULL;
-    node->length_of_the_segment = 0;
-    node->audio_data = NULL;
-
-    struct sound_seg *seg = (struct sound_seg *)malloc(sizeof(struct sound_seg));
-    seg->head = node;
-    seg->total_number_of_segments = 1; //initially, there is only 1 segment in a track
+    struct sound_seg* seg = malloc(sizeof(struct sound_seg));
+    seg->head = NULL;
+    seg->total_number_of_segments = 0;
     return seg;
-
 }
 
-void tr_destroy(struct sound_seg* obj) {
-    struct sound_seg_node* current = obj->head;
-    while (current != NULL) {
+void tr_destroy(struct sound_seg* track) {
+    struct sound_seg_node* current = track->head;
+    while (current) {
         struct sound_seg_node* next = current->next;
-        if (current->audio_data != NULL) {
-            free(current->audio_data);
+        if (--current->buffer->refcount == 0) {
+            free(current->buffer->data);
+            free(current->buffer);
         }
         free(current);
         current = next;
     }
-    free(obj);
+    free(track);
 }
 
-// Return the length of the segment
 size_t tr_length(struct sound_seg* seg) {
-    size_t result = 0;
-    struct sound_seg_node *current = seg->head;
-    while (current != NULL) {
-        result += current->length_of_the_segment;
-        current = current->next;
+    size_t total = 0;
+    for (struct sound_seg_node* n = seg->head; n; n = n->next) {
+        total += n->length;
     }
-    return result;
+    return total;
 }
-
 void tr_read(struct sound_seg* track, int16_t* dest, size_t pos, size_t len) {
-    size_t index_in_dest = 0;
-    size_t skipped_length = 0;
-    struct sound_seg_node *current = track->head;
-    while (current != NULL) {
-        if (skipped_length + current->length_of_the_segment <= pos) {
-            skipped_length += current->length_of_the_segment;
-            current = current->next;
+    size_t skipped = 0, copied = 0;
+    for (struct sound_seg_node* n = track->head; n && copied < len; n = n->next) {
+        if (skipped + n->length <= pos) {
+            skipped += n->length;
+            continue;
         }
-        else {
-            size_t offset = pos - skipped_length;
-            int16_t *first_ptr = current->audio_data;
-            // int16_t *start_position = first_ptr + offset - 1;
-            int16_t *start_position;
-            if (offset > 0) {
-                start_position = first_ptr + offset;
-            }
-            else {
-                start_position = first_ptr;
-            }
-            for (size_t i = 0; i < current->length_of_the_segment && i < len; i++) {
-                dest[index_in_dest] = *start_position;
-                start_position++;
-                index_in_dest++;
-            }
-            if (index_in_dest < len) { //still not enough
-                skipped_length += current->length_of_the_segment;
-                current = current->next;
-            }
-            else {
-                break;
-            }
-        }
-
+        size_t start = (pos > skipped) ? pos - skipped : 0;
+        size_t to_copy = (n->length - start < len - copied) ? n->length - start : len - copied;
+        memcpy(dest + copied, n->buffer->data + n->offset + start, to_copy * sizeof(int16_t));
+        copied += to_copy;
+        skipped += n->length;
     }
 }
 
 void tr_write(struct sound_seg* track, int16_t* src, size_t pos, size_t len) {
-    struct sound_seg_node *current = track->head;
-    size_t skipped_length = 0;
-    size_t prev = 0;
-    size_t index_in_src = 0;
-    size_t count_index_in_current_segment = 0;
+    size_t skipped = 0, written = 0;
+    struct sound_seg_node* last = NULL;
 
-    // Initialize first segment if needed
-    if (current->audio_data == NULL) {
-        size_t new_size = pos + len;
-        current->audio_data = malloc(sizeof(int16_t) * new_size);
-        if (!current->audio_data) return;
-        for (size_t i = 0; i < new_size; i++) {
-            current->audio_data[i] = 0;
-        }
-        current->length_of_the_segment = new_size;
-    }
-
-    while (current != NULL) {
-        size_t current_length = current->length_of_the_segment;
-
-        if (skipped_length + current_length <= pos && track->total_number_of_segments > 1) {
-            skipped_length += current_length;
-            current = current->next;
+    for (struct sound_seg_node* n = track->head; n && written < len; n = n->next) {
+        size_t seg_start = skipped;
+        size_t seg_end = seg_start + n->length;
+        if (seg_end <= pos) {
+            skipped += n->length;
+            last = n;
             continue;
         }
-        size_t offset = 0;
-        if (pos > skipped_length) {
-            offset = pos - skipped_length;
-        }
-        int16_t *first_ptr = current->audio_data + offset;
-        size_t available = current_length - offset;
-        size_t remaining = len - prev;
-        size_t to_write = (available < remaining) ? available : remaining;
-        for (size_t i = 0; i < to_write; i++) {
-            first_ptr[i] = src[prev + i];
-            index_in_src++;
-            count_index_in_current_segment++;
-        }
-        prev = index_in_src;
-        if (index_in_src < len) {
-            if (current->next == NULL) {
-                size_t new_size = pos + len;
-                int16_t *temp_ptr = (int16_t *) realloc(current->audio_data, sizeof(int16_t) * new_size);
-                if (!temp_ptr) return;
+        size_t offset = pos > skipped ? pos - skipped : 0;
+        size_t writable = n->length - offset;
+        size_t to_write = (len - written < writable) ? (len - written) : writable;
+        memcpy(n->buffer->data + n->offset + offset, src + written, to_write * sizeof(int16_t));
+        written += to_write;
+        skipped += n->length;
+        last = n;
+    }
 
-                for (size_t i = current_length; i < new_size; i++) {
-                    temp_ptr[i] = 0;
-                }
-                current->audio_data = temp_ptr;
-                current->length_of_the_segment = new_size;
-                int16_t *restart_position = current->audio_data + offset + count_index_in_current_segment;
-                for (size_t i = prev; i < len; i++) {
-                    *restart_position = src[i];
-                    restart_position++;
-                }
-                return;
-            } else {
-                current = current->next;
-                skipped_length += current->length_of_the_segment;
-                count_index_in_current_segment = 0;
-            }
+    while (written < len) {
+        struct shared_buffer* buf = malloc(sizeof(struct shared_buffer));
+        buf->data = malloc((len - written) * sizeof(int16_t));
+        memcpy(buf->data, src + written, (len - written) * sizeof(int16_t));
+        buf->refcount = 1;
+
+        struct sound_seg_node* node = malloc(sizeof(struct sound_seg_node));
+        node->buffer = buf;
+        node->offset = 0;
+        node->length = len - written;
+        node->next = NULL;
+
+        if (last == NULL) {
+            track->head = node;
         } else {
-            return;
+            last->next = node;
         }
+        track->total_number_of_segments++;
+        break;
     }
 }
+
 bool tr_delete_range(struct sound_seg* track, size_t pos, size_t len) {
     size_t skipped = 0;
     struct sound_seg_node* current = track->head;
     struct sound_seg_node* prev = NULL;
+
     while (current && len > 0) {
         size_t seg_start = skipped;
-        size_t seg_end = seg_start + current->length_of_the_segment;
+        size_t seg_end = seg_start + current->length;
+
         if (seg_end <= pos) {
             skipped = seg_end;
             prev = current;
             current = current->next;
             continue;
         }
+
         size_t offset = pos > skipped ? pos - skipped : 0;
-        size_t deletable = current->length_of_the_segment - offset;
+        size_t deletable = current->length - offset;
         size_t to_delete = (deletable > len) ? len : deletable;
 
-        if (offset + to_delete < current->length_of_the_segment) {
-            memmove(current->audio_data + offset,
-                    current->audio_data + offset + to_delete,
-                    (current->length_of_the_segment - offset - to_delete) * sizeof(int16_t));
+        if (offset + to_delete < current->length) {
+            memmove(current->buffer->data + current->offset + offset,
+                    current->buffer->data + current->offset + offset + to_delete,
+                    (current->length - offset - to_delete) * sizeof(int16_t));
         }
-        current->length_of_the_segment -= to_delete;
+        current->length -= to_delete;
         len -= to_delete;
-        skipped = seg_start + current->length_of_the_segment;
-        if (current->length_of_the_segment == 0 && current != track->head) {
+        skipped = seg_start + current->length;
+
+        if (current->length == 0 && current != track->head) {
             if (prev) prev->next = current->next;
-            free(current->audio_data);
+            if (--current->buffer->refcount == 0) {
+                free(current->buffer->data);
+                free(current->buffer);
+            }
             free(current);
             current = (prev) ? prev->next : track->head;
             track->total_number_of_segments--;
@@ -271,153 +237,48 @@ bool tr_delete_range(struct sound_seg* track, size_t pos, size_t len) {
     return true;
 }
 
-double compute_cross_relation(int16_t *array1 , int16_t *array2 , size_t len) {
-    double sum1 = 0;
-    double sum2 = 0;
-    int16_t *ptr1 = array1;
-    int16_t *ptr2 = array2;
-    for (size_t i = 0; i < len; i++) {
-        sum1 += (double) (*ptr1)*(*ptr2);
-        sum2 += (double) (*ptr2)*(*ptr2);
-        ptr1++;
-        ptr2++;
-    }
-    return sum1/sum2;
-}
+char* tr_identify(struct sound_seg* target, struct sound_seg* ad) {
+    size_t len_target = tr_length(target);
+    size_t len_ad = tr_length(ad);
+    if (len_target < len_ad) return strdup("");
 
-// Returns a string containing <start>,<end> ad pairs in target
-// char* tr_identify(struct sound_seg* target, struct sound_seg* ad){
-//     size_t temp_size = 256;
-//     char* ptr = (char*)malloc(temp_size);
-//     if (ptr == NULL) {
-//         return NULL;
-//     }
-//     ptr[0] = '\0';
-//     double threshold = 0.95;
-//     size_t current_length = 0;
-//     for (int i = 0; i <= target->length - ad->length; i++) {
-//         int found = 1;
-//         double cross_relation = compute_cross_relation(&target->ptr[i], ad->ptr, ad->length);
-//         if (cross_relation < threshold) {
-//             found = 0;
-//         }
-//         if (found == 1) { //found
-//             size_t last_index = i + ad->length - 1;
-//             char temp[32];
-//             snprintf(temp, sizeof(temp), "%zu,%zu\n", i, last_index);
-//             size_t length = strlen(temp);
-//             if (current_length + length + 1 >= temp_size) {
-//                 temp_size *= 2;
-//                 char* temp_ptr = (char*)realloc(ptr, temp_size);
-//                 if (!temp_ptr) {
-//                     free(ptr);
-//                     return NULL;
-//                 }
-//                 ptr = temp_ptr;
-//             }
-//             strcat(ptr, temp);
-//             current_length += length;
-//         }
-//     }
-//     if (current_length == 0) {
-//         free(ptr);
-//         char *str = "";
-//         return str;
-//     }
-//     if (ptr[strlen(ptr) - 1] == '\n') {
-//         ptr[strlen(ptr) - 1] = '\0';
-//     }
-//     return ptr;
-// }
-char* tr_identify(const struct sound_seg* target, const struct sound_seg* ad) {
-    size_t target_len = tr_length((struct sound_seg*)target);
-    size_t ad_len = tr_length((struct sound_seg*)ad);
-    if (target_len < ad_len) return strdup("");
+    int16_t* buf_target = malloc(len_target * sizeof(int16_t));
+    int16_t* buf_ad = malloc(len_ad * sizeof(int16_t));
+    tr_read(target, buf_target, 0, len_target);
+    tr_read(ad, buf_ad, 0, len_ad);
 
-    int16_t* target_data = malloc(target_len * sizeof(int16_t));
-    int16_t* ad_data = malloc(ad_len * sizeof(int16_t));
-    tr_read((struct sound_seg*)target, target_data, 0, target_len);
-    tr_read((struct sound_seg*)ad, ad_data, 0, ad_len);
-    char* result = malloc(256);
-    size_t capacity = 256;
-    size_t used = 0;
+    double threshold = 0.95;
+    size_t result_buf_size = 1024;
+    char* result = calloc(result_buf_size, sizeof(char));
     result[0] = '\0';
-    for (size_t i = 0; i <= target_len - ad_len; i++) {
-        double corr = compute_cross_relation(target_data + i, ad_data, ad_len);
-        if (corr >= 0.95) {
-            char temp[32];
-            snprintf(temp, sizeof(temp), "%zu,%zu\n", i, i + ad_len - 1);
-            size_t len = strlen(temp);
-            if (used + len + 1 > capacity) {
-                capacity *= 2;
-                result = realloc(result, capacity);
+
+    for (size_t i = 0; i <= len_target - len_ad; ++i) {
+        double score = compute_cross_relation(&buf_target[i], buf_ad, len_ad);
+        if (score >= threshold) {
+            char entry[64];
+            snprintf(entry, sizeof(entry), "%zu,%zu\n", i, i + len_ad - 1);
+            if (strlen(result) + strlen(entry) + 1 >= result_buf_size) {
+                result_buf_size *= 2;
+                result = realloc(result, result_buf_size);
             }
-            strcat(result, temp);
-            used += len;
+            strcat(result, entry);
         }
     }
-    free(target_data);
-    free(ad_data);
-    if (used == 0) {
+
+    free(buf_target);
+    free(buf_ad);
+
+    if (strlen(result) == 0) {
         free(result);
         return strdup("");
     }
-    if (used > 0 && result[used - 1] == '\n') result[used - 1] = '\0';
+    result[strlen(result) - 1] = '\0';
     return result;
 }
 
 // Insert a portion of src_track into dest_track at position destpos
 void tr_insert(struct sound_seg* src, struct sound_seg* dest, size_t destpos, size_t srcpos, size_t len) {
-    size_t skipped_src = 0;
-    struct sound_seg_node* src_node = src->head;
-    while (src_node && skipped_src + src_node->length_of_the_segment <= srcpos) {
-        skipped_src += src_node->length_of_the_segment;
-        src_node = src_node->next;
-    }
-    if (!src_node) return;
 
-    size_t offset_in_src = srcpos - skipped_src;
-    if (offset_in_src + len > src_node->length_of_the_segment) return;
-
-    struct sound_seg_node* new_node = malloc(sizeof(struct sound_seg_node));
-    new_node->audio_data = src_node->audio_data + offset_in_src;
-    new_node->length_of_the_segment = len;
-    new_node->next = NULL;
-
-    size_t skipped_dest = 0;
-    struct sound_seg_node* current = dest->head;
-    struct sound_seg_node* prev = NULL;
-
-    while (current && skipped_dest + current->length_of_the_segment <= destpos) {
-        skipped_dest += current->length_of_the_segment;
-        prev = current;
-        current = current->next;
-    }
-
-    size_t offset_in_dest = destpos - skipped_dest;
-
-    if (!current) {
-        if (prev) prev->next = new_node;
-    } else if (offset_in_dest == 0) {
-        if (prev) {
-            prev->next = new_node;
-            new_node->next = current;
-        } else {
-            new_node->next = dest->head;
-            dest->head = new_node;
-        }
-    } else {
-        struct sound_seg_node* split = malloc(sizeof(struct sound_seg_node));
-        split->length_of_the_segment = current->length_of_the_segment - offset_in_dest;
-        split->audio_data = current->audio_data + offset_in_dest;
-        split->next = current->next;
-
-        current->length_of_the_segment = offset_in_dest;
-        current->next = new_node;
-        new_node->next = split;
-    }
-
-    dest->total_number_of_segments++;
 }
 
 int main(int argc, char** argv) {
