@@ -110,6 +110,7 @@ void tr_destroy(struct sound_seg* obj) {
         struct sound_seg_node* next = current->next;
         if (current->audio_data != NULL) {
             free(current->audio_data);
+            current->audio_data = NULL;
         }
         free(current);
         current = next;
