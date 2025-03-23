@@ -309,10 +309,76 @@ char* tr_identify(struct sound_seg* target, struct sound_seg* ad) {
     return result;
 }
 
-// Insert a portion of src_track into dest_track at position destpos
 void tr_insert(struct sound_seg* src, struct sound_seg* dest, size_t destpos, size_t srcpos, size_t len) {
+    size_t skipped = 0;
+    struct sound_seg_node* node = src->head;
+    while (node && skipped + node->length <= srcpos) {
+        skipped += node->length;
+        node = node->next;
+    }
+    size_t remaining = len;
+    size_t src_offset = srcpos - skipped;
+    struct sound_seg_node* insert_head = NULL;
+    struct sound_seg_node* insert_tail = NULL;
+    while (node && remaining > 0) {
+        size_t available = node->length - src_offset;
+        size_t to_copy = (available < remaining) ? available : remaining;
+        struct sound_seg_node* new_node = malloc(sizeof(struct sound_seg_node));
+        new_node->buffer = node->buffer;
+        new_node->offset = node->offset + src_offset;
+        new_node->length = to_copy;
+        new_node->next = NULL;
+        new_node->buffer->refcount++;
+        if (insert_head == NULL) {
+            insert_head = new_node;
+            insert_tail = new_node;
+        } else {
+            insert_tail->next = new_node;
+            insert_tail = new_node;
+        }
 
+        remaining -= to_copy;
+        node = node->next;
+        src_offset = 0;
+    }
+    skipped = 0;
+    struct sound_seg_node* curr = dest->head;
+    struct sound_seg_node* prev = NULL;
+    while (curr && skipped + curr->length < destpos) {
+        skipped += curr->length;
+        prev = curr;
+        curr = curr->next;
+    }
+    size_t offset = destpos - skipped;
+    if (curr && offset > 0) {
+        struct sound_seg_node* new_node = malloc(sizeof(struct sound_seg_node));
+        new_node->buffer = curr->buffer;
+        new_node->offset = curr->offset;
+        new_node->length = offset;
+        new_node->next = insert_head;
+        new_node->buffer->refcount++;
+        if (prev) {
+            prev->next = new_node;
+        } else {
+            dest->head = new_node;
+        }
+        prev = new_node;
+        curr->offset += offset;
+        curr->length -= offset;
+    } else if (prev) {
+        prev->next = insert_head;
+    } else {
+        dest->head = insert_head;
+    }
+    if (insert_tail) {
+        insert_tail->next = curr;
+    }
+    while (insert_head) {
+        dest->total_number_of_segments++;
+        insert_head = insert_head->next;
+    }
 }
+
 
 int main(int argc, char** argv) {
     struct sound_seg* s0 = tr_init();
