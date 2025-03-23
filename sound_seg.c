@@ -328,7 +328,7 @@ void tr_insert(struct sound_seg* src, struct sound_seg* dest, size_t destpos, si
         skipped_src += cur_src->length_of_the_segment;
         cur_src = cur_src->next;
     }
-    if (!cur_src) return; // srcpos out of range
+    if (!cur_src) return;
     size_t offset_in_src = srcpos - skipped_src;
     size_t remaining = len;
 
