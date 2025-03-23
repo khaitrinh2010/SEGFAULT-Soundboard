@@ -217,6 +217,9 @@ bool tr_delete_range(struct sound_seg* track, size_t pos, size_t len) {
     struct sound_seg_node* current = track->head;
     struct sound_seg_node* prev = NULL;
     while (current != NULL && len > 0) {
+        if (current->buffer->refcount > 1) {
+            return false;
+        }
         size_t seg_start = skipped;
         size_t seg_end = seg_start + current->length;
         if (seg_end <= pos) {
@@ -240,6 +243,7 @@ bool tr_delete_range(struct sound_seg* track, size_t pos, size_t len) {
         current->length -= to_delete;
         len -= to_delete;
         skipped = seg_start + current->length;
+
         if (current->length == 0 && current != track->head) {
             if (prev != NULL) {
                 prev->next = current->next;
