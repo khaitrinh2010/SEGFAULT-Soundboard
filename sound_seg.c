@@ -222,11 +222,11 @@ bool tr_delete_range(struct sound_seg* track, size_t pos, size_t len) {
     struct sound_seg_node* prev = NULL;
 
     while (node != NULL && len > 0) {
-        size_t start = skipped;
-        size_t end = start + node->length;
+        size_t seg_start = skipped;
+        size_t seg_end = seg_start + node->length;
 
-        if (end <= pos) {
-            skipped = end;
+        if (seg_end <= pos) {
+            skipped = seg_end;
             prev = node;
             node = node->next;
             continue;
@@ -240,17 +240,21 @@ bool tr_delete_range(struct sound_seg* track, size_t pos, size_t len) {
         size_t deletable = node->length - offset;
         size_t to_delete = (deletable < len) ? deletable : len;
 
-        if ((node->is_parent || node->is_child) && to_delete > 0) {
-            return false;
+        // ❗ Check only the samples that would be deleted
+        for (size_t i = 0; i < to_delete; i++) {
+            if (node->is_parent || node->is_child) {
+                return false;
+            }
         }
 
+        // Shift elements left
         for (size_t i = offset; i + to_delete < node->length; i++) {
             node->buffer->data[node->offset + i] = node->buffer->data[node->offset + i + to_delete];
         }
 
         node->length -= to_delete;
         len -= to_delete;
-        skipped = start + node->length;
+        skipped = seg_start + node->length;
 
         if (node->length == 0 && node != track->head) {
             if (prev != NULL) {
