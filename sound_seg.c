@@ -347,84 +347,65 @@ char* tr_identify(const struct sound_seg* target, const struct sound_seg* ad) {
     return result;
 }
 
-// Insert a portion of src_track into dest_track at position destpos
 void tr_insert(struct sound_seg* src, struct sound_seg* dest, size_t destpos, size_t srcpos, size_t len) {
-    size_t skipped = 0;
-    struct sound_seg_node* current = src->head;
-
-    // 1. Find start node in src
-    while (current && skipped + current->length_of_the_segment <= srcpos) {
-        skipped += current->length_of_the_segment;
-        current = current->next;
+    size_t skipped_src = 0;
+    struct sound_seg_node* cur_src = src->head;
+    while (cur_src && skipped_src + cur_src->length_of_the_segment <= srcpos) {
+        skipped_src += cur_src->length_of_the_segment;
+        cur_src = cur_src->next;
     }
-    if (!current) return;
-
-    size_t offset = srcpos - skipped;
-    size_t copied = 0;
-
+    if (!cur_src) return;
+    size_t offset_in_src = srcpos - skipped_src;
     int16_t* buffer = malloc(len * sizeof(int16_t));
     if (!buffer) return;
-
-    // 2. Copy data into new buffer using for-loop (no memcpy)
-    struct sound_seg_node* temp = current;
     size_t written = 0;
+    struct sound_seg_node* temp = cur_src;
     while (temp && written < len) {
-        size_t i = (temp == current) ? offset : 0;
-        while (i < temp->length_of_the_segment && written < len) {
+        size_t i = (temp == cur_src) ? offset_in_src : 0;
+        while (i < temp->length_of_the_segment && written < len)
             buffer[written++] = temp->audio_data[i++];
-        }
         temp = temp->next;
     }
-
     struct sound_seg_node* new_node = malloc(sizeof(struct sound_seg_node));
     new_node->audio_data = buffer;
     new_node->length_of_the_segment = len;
     new_node->next = NULL;
-
-    // 3. Insert the new node into dest at position destpos
-    skipped = 0;
-    current = dest->head;
+    size_t skipped_dest = 0;
+    struct sound_seg_node* cur = dest->head;
     struct sound_seg_node* prev = NULL;
 
-    while (current && skipped + current->length_of_the_segment <= destpos) {
-        skipped += current->length_of_the_segment;
-        prev = current;
-        current = current->next;
+    while (cur && skipped_dest + cur->length_of_the_segment <= destpos) {
+        skipped_dest += cur->length_of_the_segment;
+        prev = cur;
+        cur = cur->next;
     }
-
-    size_t offset_dest = destpos - skipped;
-
-    if (!current) {
+    size_t offset_dest = destpos - skipped_dest;
+    if (!cur) {
         if (prev) prev->next = new_node;
     } else if (offset_dest == 0) {
         if (prev) {
             prev->next = new_node;
-            new_node->next = current;
+            new_node->next = cur;
         } else {
             new_node->next = dest->head;
             dest->head = new_node;
         }
     } else {
-        // Split current node
         struct sound_seg_node* split = malloc(sizeof(struct sound_seg_node));
-        size_t split_len = current->length_of_the_segment - offset_dest;
+        size_t split_len = cur->length_of_the_segment - offset_dest;
         split->audio_data = malloc(sizeof(int16_t) * split_len);
-        if (!split->audio_data) return;
-
-        for (size_t i = 0; i < split_len; i++) {
-            split->audio_data[i] = current->audio_data[offset_dest + i];
-        }
+        for (size_t i = 0; i < split_len; i++)
+            split->audio_data[i] = cur->audio_data[offset_dest + i];
         split->length_of_the_segment = split_len;
-        split->next = current->next;
-        current->length_of_the_segment = offset_dest;
+        split->next = cur->next;
 
-        struct sound_seg_node* new_audio = malloc(sizeof(int16_t) * offset_dest);
-        for (size_t i = 0; i < offset_dest; i++) {
-            new_audio->audio_data[i] = current->audio_data[i];
-        }
-        free(current->audio_data);
-        current->audio_data = new_audio;
-        current->next = new_node;
+        int16_t* new_audio = malloc(sizeof(int16_t) * offset_dest);
+        for (size_t i = 0; i < offset_dest; i++)
+            new_audio[i] = cur->audio_data[i];
+        free(cur->audio_data);
+        cur->audio_data = new_audio;
+        cur->length_of_the_segment = offset_dest;
+        cur->next = new_node;
         new_node->next = split;
     }
     dest->total_number_of_segments++;
