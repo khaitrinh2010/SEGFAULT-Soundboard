@@ -129,39 +129,20 @@ size_t tr_length(struct sound_seg* seg) {
 }
 
 void tr_read(struct sound_seg* track, int16_t* dest, size_t pos, size_t len) {
-    size_t index_in_dest = 0;
-    size_t skipped_length = 0;
-    struct sound_seg_node *current = track->head;
-    while (current != NULL) {
-        if (skipped_length + current->length_of_the_segment <= pos) {
-            skipped_length += current->length_of_the_segment;
+    size_t skipped = 0, written = 0;
+    struct sound_seg_node* current = track->head;
+    while (current && written < len) {
+        if (skipped + current->length_of_the_segment <= pos) {
+            skipped += current->length_of_the_segment;
             current = current->next;
+            continue;
         }
-        else {
-            size_t offset = pos - skipped_length;
-            int16_t *first_ptr = current->audio_data;
-            // int16_t *start_position = first_ptr + offset - 1;
-            int16_t *start_position;
-            if (offset > 0) {
-                start_position = first_ptr + offset;
-            }
-            else {
-                start_position = first_ptr;
-            }
-            for (size_t i = 0; i < current->length_of_the_segment && i < len; i++) {
-                dest[index_in_dest] = *start_position;
-                start_position++;
-                index_in_dest++;
-            }
-            if (index_in_dest < len) { //still not enough
-                skipped_length += current->length_of_the_segment;
-                current = current->next;
-            }
-            else {
-                break;
-            }
+        size_t start = (pos > skipped) ? (pos - skipped) : 0;
+        for (size_t i = start; i < current->length_of_the_segment && written < len; i++) {
+            dest[written++] = current->audio_data[i];
         }
-
+        skipped += current->length_of_the_segment;
+        current = current->next;
     }
 }
 
