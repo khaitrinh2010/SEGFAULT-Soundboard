@@ -198,11 +198,9 @@ bool tr_delete_range(struct sound_seg* track, size_t pos, size_t len) {
     size_t skipped = 0;
     struct sound_seg_node* current = track->head;
     struct sound_seg_node* prev = NULL;
-
     while (current && len > 0) {
         size_t seg_start = skipped;
         size_t seg_end = seg_start + current->length_of_the_segment;
-
         if (seg_end <= pos) {
             skipped = seg_end;
             prev = current;
@@ -212,73 +210,23 @@ bool tr_delete_range(struct sound_seg* track, size_t pos, size_t len) {
         size_t offset = (pos > skipped) ? pos - skipped : 0;
         size_t deletable = current->length_of_the_segment - offset;
         size_t to_delete = (len < deletable) ? len : deletable;
-        if (current->ref_count > 0) return false;
-        bool is_child = current->parent_node != NULL;
-        if (is_child && (offset > 0 || offset + to_delete < current->length_of_the_segment)) {
-            struct sound_seg_node* before = NULL;
-            if (offset > 0) {
-                before = malloc(sizeof(struct sound_seg_node));
-                before->audio_data = current->audio_data;
-                before->length_of_the_segment = offset;
-                before->owns_data = false;
-                before->ref_count = 0;
-                before->parent_node = current->parent_node;
-                before->next = NULL;
-            }
-            struct sound_seg_node* after = NULL;
-            size_t after_len = current->length_of_the_segment - offset - to_delete;
-            if (after_len > 0) {
-                after = malloc(sizeof(struct sound_seg_node));
-                after->audio_data = current->audio_data + offset + to_delete;
-                after->length_of_the_segment = after_len;
-                after->owns_data = false;
-                after->ref_count = 0;
-                after->parent_node = current->parent_node;
-                after->next = current->next;
-            }
-            if (current->parent_node) {
-                current->parent_node->ref_count--;
-            }
-            if (before) {
-                before->next = after ? after : current->next;
-                if (prev) prev->next = before;
-                else track->head = before;
-                prev = before;
-            } else if (after) {
-                if (prev) prev->next = after;
-                else track->head = after;
-                prev = after;
-            } else {
-                if (prev) prev->next = current->next;
-                else track->head = current->next;
-            }
-            free(current);
-            current = (after ? after : (before ? before->next : prev ? prev->next : NULL));
-            track->total_number_of_segments--;
-            len -= to_delete;
-            skipped = seg_end;
-            continue;
-        }
         for (size_t i = offset; i + to_delete < current->length_of_the_segment; i++) {
             current->audio_data[i] = current->audio_data[i + to_delete];
         }
         current->length_of_the_segment -= to_delete;
         len -= to_delete;
         skipped = seg_end;
-
         if (current->length_of_the_segment == 0 && current != track->head) {
-            struct sound_seg_node* to_free = current;
             if (prev) prev->next = current->next;
-            current = current->next;
-            if (to_free->owns_data && to_free->audio_data) {
-                free(to_free->audio_data);
+
+            if (current->owns_data && current->audio_data != NULL) {
+                free(current->audio_data);
             }
-            free(to_free);
+            free(current);
+            current = (prev) ? prev->next : track->head;
             track->total_number_of_segments--;
-        } else {
-            prev = current;
-            current = current->next;
         }
+
     }
 
     return true;
