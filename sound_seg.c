@@ -321,7 +321,6 @@ char* tr_identify(const struct sound_seg* target, const struct sound_seg* ad) {
 
 void tr_insert(struct sound_seg* src, struct sound_seg* dest, size_t destpos, size_t srcpos, size_t len) {
     if (!src || !dest || len == 0) return;
-
     struct sound_seg_node* cur_src = src->head;
     size_t skipped = 0;
     cur_src->owns_data = true;
@@ -337,7 +336,12 @@ void tr_insert(struct sound_seg* src, struct sound_seg* dest, size_t destpos, si
         struct sound_seg_node* before = malloc(sizeof(struct sound_seg_node));
         before->audio_data = cur_src->audio_data;
         before->length_of_the_segment = offset;
-        before->owns_data = cur_src->owns_data;
+        if (before->audio_data == src->head->audio_data) {
+            before->owns_data = true;
+        }
+        else {
+            before->owns_data = false;
+        }
         before->next = cur_src;
         cur_src->audio_data = cur_src->audio_data + offset;
         cur_src->length_of_the_segment -= offset;
