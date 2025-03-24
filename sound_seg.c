@@ -14,6 +14,7 @@ struct sound_seg_node {
     struct sound_seg_node* next;
     size_t length_of_the_segment;  // How many samples from this segment
     int16_t* audio_data; //start element in the buffer
+    bool owns_data; //if this node should free the memory
 };
 
 struct sound_seg {
@@ -103,14 +104,12 @@ struct sound_seg* tr_init() {
     return seg;
 
 }
-
 void tr_destroy(struct sound_seg* obj) {
     struct sound_seg_node* current = obj->head;
     while (current != NULL) {
         struct sound_seg_node* next = current->next;
-        if (current->audio_data != NULL) {
+        if (current->owns_data && current->audio_data != NULL) {
             free(current->audio_data);
-            current->audio_data = NULL;
         }
         free(current);
         current = next;
@@ -323,57 +322,48 @@ char* tr_identify(const struct sound_seg* target, const struct sound_seg* ad) {
 void tr_insert(struct sound_seg* src, struct sound_seg* dest, size_t destpos, size_t srcpos, size_t len) {
     if (!src || !dest || len == 0) return;
     struct sound_seg_node* cur_src = src->head;
-    size_t skipped_src = 0;
-
-    while (cur_src && skipped_src + cur_src->length_of_the_segment <= srcpos) {
-        skipped_src += cur_src->length_of_the_segment;
+    size_t skipped = 0;
+    while (cur_src && skipped + cur_src->length_of_the_segment <= srcpos) {
+        skipped += cur_src->length_of_the_segment;
         cur_src = cur_src->next;
     }
     if (!cur_src) return;
-    size_t offset_in_src = srcpos - skipped_src;
-    size_t remaining = len;
+    size_t offset = srcpos - skipped;
+    if (offset + len > cur_src->length_of_the_segment) return; // Prevent out-of-bounds
+    int16_t* shared_ptr = cur_src->audio_data + offset;
 
-    struct sound_seg_node* shared_head = NULL;
-    struct sound_seg_node** shared_tail = &shared_head;
 
-    while (cur_src && remaining > 0) {
-        size_t available = cur_src->length_of_the_segment - offset_in_src;
-        size_t copy_len = (available < remaining) ? available : remaining;
-        struct sound_seg_node* new_node = malloc(sizeof(struct sound_seg_node));
-        new_node->audio_data = cur_src->audio_data + offset_in_src;
-        new_node->length_of_the_segment = copy_len;
-        new_node->next = NULL;
-        *shared_tail = new_node;
-        shared_tail = &new_node->next;
-        remaining -= copy_len;
-        cur_src = cur_src->next;
-        offset_in_src = 0;
-    }
-    if (remaining > 0) {
-        return;
-    }
+    struct sound_seg_node* src_shared_node = malloc(sizeof(struct sound_seg_node));
+    src_shared_node->audio_data = shared_ptr;
+    src_shared_node->length_of_the_segment = len;
+    src_shared_node->owns_data = true;
+    src_shared_node->next = cur_src->next;
+    cur_src->next = src_shared_node;
+    src->total_number_of_segments++;
+    struct sound_seg_node* dest_shared_node = malloc(sizeof(struct sound_seg_node));
+    dest_shared_node->audio_data = shared_ptr;
+    dest_shared_node->length_of_the_segment = len;
+    dest_shared_node->owns_data = false;
+    dest_shared_node->next = NULL;
     struct sound_seg_node* cur_dest = dest->head;
     struct sound_seg_node* prev_dest = NULL;
-    size_t skipped_dest = 0;
-    while (cur_dest && skipped_dest + cur_dest->length_of_the_segment <= destpos) {
-        skipped_dest += cur_dest->length_of_the_segment;
+    size_t dest_skipped = 0;
+    while (cur_dest && dest_skipped + cur_dest->length_of_the_segment <= destpos) {
+        dest_skipped += cur_dest->length_of_the_segment;
         prev_dest = cur_dest;
         cur_dest = cur_dest->next;
     }
-    if (!prev_dest) {
-        // Insert at head
-        struct sound_seg_node* last = shared_head;
-        while (last->next) last = last->next;
-        last->next = dest->head;
-        dest->head = shared_head;
-    } else {
-        struct sound_seg_node* last = shared_head;
-        while (last->next) last = last->next;
-        last->next = cur_dest;
-        prev_dest->next = shared_head;
-    }
-}
 
+    if (!prev_dest) {
+        dest_shared_node->next = dest->head;
+        dest->head = dest_shared_node;
+    } else {
+        dest_shared_node->next = prev_dest->next;
+        prev_dest->next = dest_shared_node;
+    }
+
+    dest->total_number_of_segments++;
+}
 
 int main(int argc, char** argv) {
     struct sound_seg* s0 = tr_init();
