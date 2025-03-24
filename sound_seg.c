@@ -100,7 +100,7 @@ struct sound_seg* tr_init() {
     node->length_of_the_segment = 0;
     node->audio_data = NULL;
     node->ref_count = 0;
-    node->owns_data = false;
+    node->owns_data = true;
     node->parent_node = NULL;
 
     struct sound_seg *seg = (struct sound_seg *)malloc(sizeof(struct sound_seg));
@@ -472,47 +472,20 @@ void print_track_metadata(struct sound_seg* track, const char* track_name) {
 }
 
 
-int main(int argc, char** argv) {
-    // struct sound_seg* s0 = tr_init();
-    // tr_write(s0, ((int16_t[]){-7,-15,-17,6,-3,-8,17}), 0, 7);
-    // struct sound_seg* s1 = tr_init();
-    // tr_write(s1, ((int16_t[]){-7,1,6}), 0, 3);
-    // struct sound_seg* s2 = tr_init();
-    // tr_write(s2, ((int16_t[]){-17,-8,1,-7,-2,-16}), 0, 6);
-    // struct sound_seg* s3 = tr_init();
-    // tr_write(s3, ((int16_t[]){-12,20}), 0, 2);
-    // struct sound_seg* s4 = tr_init();
-    // tr_write(s4, ((int16_t[]){0,12,14}), 0, 3);
-    // tr_delete_range(s1, 1, 1); //expect return True
-    // tr_insert(s2, s2, 6, 2, 4);
-    // tr_write(s3, ((int16_t[]){-18,15}), 0, 2);
-    // tr_write(s1, ((int16_t[]){-18,-8}), 0, 2);
-    // tr_write(s4, ((int16_t[]){6,6,-18}), 0, 3);
-    // tr_write(s0, ((int16_t[]){-10,-19,3,5,6,1,-7}), 0, 7);
-    // tr_delete_range(s3, 0, 1); //expect return True
-    // tr_insert(s0, s0, 5, 4, 1);
-    // tr_write(s0, ((int16_t[]){8,17,-18,-20,19,-2,-13,6}), 0, 8);
-    // tr_write(s1, ((int16_t[]){-20,-2}), 0, 2);
-    // tr_write(s2, ((int16_t[]){11,0,14,-14,19,14,-4,15,8,6}), 0, 10);
-    // tr_write(s4, ((int16_t[]){-11,9,8}), 0, 3);
-    // tr_write(s3, ((int16_t[]){16}), 0, 1);
-    // tr_insert(s1, s3, 0, 0, 2);
-    // tr_write(s3, ((int16_t[]){3,19,-17}), 0, 3);
-    // tr_write(s0, ((int16_t[]){-8,14,-10,12,-19,-7,-13,-15}), 0, 8);
-    // tr_insert(s4, s2, 1, 1, 1);
-    //
-    // tr_write(s2, ((int16_t[]){-4,-8,12,14,-9,-13,19,15,12,-6,-16}), 0, 11);
-    //
-    // tr_write(s1, ((int16_t[]){5,-12}), 0, 2);
-    // tr_write(s0, ((int16_t[]){-7,-15,12,-1,-17,-15,-10,-17}), 0, 8);
-    // tr_write(s4, ((int16_t[]){6,11,-3}), 0, 3);
-    //
-    // bool ans = tr_delete_range(s4, 1, 1); //expect return False
-    // printf("%d\n", ans);
-    // //expected False, actual True
-    // tr_destroy(s0);
-    // tr_destroy(s1);
-    // tr_destroy(s2);
-    // tr_destroy(s3);
-    // tr_destroy(s4);
+int main(int argc, char** argv) {struct sound_seg* s0 = tr_init();
+    tr_write(s0, ((int16_t[]){}), 0, 0);
+    tr_write(s0, ((int16_t[]){-3}), 0, 1);
+    tr_write(s0, ((int16_t[]){1}), 0, 1);
+    tr_write(s0, ((int16_t[]){7}), 0, 1);
+    tr_write(s0, ((int16_t[]){17}), 0, 1);
+    tr_write(s0, ((int16_t[]){7}), 0, 1);
+    tr_write(s0, ((int16_t[]){-14}), 0, 1);
+    tr_write(s0, ((int16_t[]){-1,-18,-10,-16}), 0, 4);
+    tr_write(s0, ((int16_t[]){-2,15,1,-2}), 0, 4);
+    tr_write(s0, ((int16_t[]){-10,1}), 0, 2);
+    tr_write(s0, ((int16_t[]){-1,-10,14,-14}), 0, 4);
+    tr_write(s0, ((int16_t[]){0,0,0,0}), 0, 4);
+    tr_write(s0, ((int16_t[]){3,3,3,3}), 0, 4);
+    tr_write(s0, ((int16_t[]){-13,-13,-13,-13}), 0, 4);
+    tr_destroy(s0);
 }
