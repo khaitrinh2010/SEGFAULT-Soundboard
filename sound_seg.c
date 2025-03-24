@@ -221,7 +221,7 @@ bool tr_delete_range(struct sound_seg* track, size_t pos, size_t len) {
             }
             free(current);
             current = (prev) ? prev->next : track->head;
-            track->total_number_of_segments--; //
+            track->total_number_of_segments--;
         }
 
     }
