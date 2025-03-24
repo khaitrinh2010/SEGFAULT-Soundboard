@@ -15,6 +15,7 @@ struct sound_seg_node {
     size_t length_of_the_segment;  // How many samples from this segment
     int16_t* audio_data; //start element in the buffer
     bool owns_data; //if this node should free the memory
+    struct sound_seg_node* parent_node;
     int ref_count;
 };
 
@@ -152,9 +153,6 @@ void tr_read(struct sound_seg* track, int16_t* dest, size_t pos, size_t len) {
 }
 
 void tr_write(struct sound_seg* track, int16_t* src, size_t pos, size_t len) {
-    // int16_t* test = (int16_t*)malloc(sizeof(int16_t) * tr_length(track));
-    // tr_read(track, test, 0, tr_length(track));
-    // free(test);
     size_t skipped = 0, written = 0;
     struct sound_seg_node* cur = track->head;
 
@@ -162,53 +160,69 @@ void tr_write(struct sound_seg* track, int16_t* src, size_t pos, size_t len) {
         size_t seg_len = cur->length_of_the_segment;
         size_t seg_start = skipped;
         size_t seg_end = seg_start + seg_len;
+
         if (seg_end <= pos) {
             skipped = seg_end;
             cur = cur->next;
             continue;
         }
+
         size_t offset = (pos > skipped) ? (pos - skipped) : 0;
         size_t available = seg_len > offset ? seg_len - offset : 0;
         size_t to_write = (len - written < available) ? (len - written) : available;
+
         for (size_t i = 0; i < to_write; i++) {
             cur->audio_data[offset + i] = src[written++];
         }
+
         skipped = seg_end;
         cur = cur->next;
     }
+
     if (written < len) {
+        size_t remaining = len - written;
         struct sound_seg_node* last = track->head;
         while (last->next) last = last->next;
-        size_t new_len = pos + (len - written);
-        int16_t* new_data;
+
+        // Case 1: empty segment (head only, audio_data == NULL)
         if (last->audio_data == NULL) {
-            new_data = malloc(new_len * sizeof(int16_t));
-            if (!new_data) return;
+            last->audio_data = malloc(remaining * sizeof(int16_t));
+            if (!last->audio_data) return;
+            last->length_of_the_segment = remaining;
             last->owns_data = true;
-            for (size_t i = 0; i < new_len; i++) {
-                new_data[i] = 0;  // Initialize to zero
+            last->ref_count = 0;
+            last->parent_node = NULL;
+            for (size_t i = 0; i < remaining; i++) {
+                last->audio_data[i] = src[written++];
             }
-        } else {
+        }
+        // Case 2: create new segment
+        else {
             struct sound_seg_node* new_node = malloc(sizeof(struct sound_seg_node));
-            last->next = new_node;
-            new_node->next = NULL;
-            new_node->length_of_the_segment = new_len;
+            if (!new_node) return;
+
+            new_node->audio_data = malloc(remaining * sizeof(int16_t));
+            if (!new_node->audio_data) {
+                free(new_node);
+                return;
+            }
+
+            new_node->length_of_the_segment = remaining;
+            new_node->owns_data = true;
             new_node->ref_count = 0;
-            new_data =  malloc(new_len * sizeof(int16_t));
-            if (!new_data) return;
-            new_node->audio_data = new_data;
-            for (size_t i = 0; i < new_len; i++) {
+            new_node->parent_node = NULL;
+            new_node->next = NULL;
+
+            for (size_t i = 0; i < remaining; i++) {
                 new_node->audio_data[i] = src[written++];
             }
-            return;
-        }
-        last->audio_data = new_data;
-        last->length_of_the_segment = new_len;
-        for (; written < len; written++) {
-            last->audio_data[pos + written] = src[written];
+
+            last->next = new_node;
+            track->total_number_of_segments++;
         }
     }
 }
+
 
 bool tr_delete_range(struct sound_seg* track, size_t pos, size_t len) {
     size_t skipped = 0;
@@ -354,6 +368,7 @@ void read_from_node(struct sound_seg_node* node) {
     printf("\n");
 }
 void read_nodes_from_linked_list(struct sound_seg* track) {
+    printf("Starting reading from linked list...\n");
     int node_id = 1;
     struct sound_seg_node* current = track->head;
     while (current != NULL) {
