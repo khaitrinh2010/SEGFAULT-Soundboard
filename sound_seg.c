@@ -175,6 +175,18 @@ void read_nodes_from_linked_list(struct sound_seg* track) {
 
 void tr_write(struct sound_seg* track, int16_t* src, size_t pos, size_t len) {
     size_t skipped = 0, written = 0;
+    if (track->head && track->head->audio_data == NULL && track->head->length_of_the_segment == 0) {
+        track->head->audio_data = malloc(len * sizeof(int16_t));
+        if (!track->head->audio_data) return;
+
+        for (size_t i = 0; i < len; i++) {
+            track->head->audio_data[i] = src[i];
+        }
+
+        track->head->length_of_the_segment = len;
+        track->head->owns_data = true;
+        return;
+    }
     struct sound_seg_node* cur = track->head;
     while (cur && written < len) {
         size_t seg_len = cur->length_of_the_segment;
@@ -355,7 +367,6 @@ char* tr_identify(const struct sound_seg* target, const struct sound_seg* ad) {
     if (used > 0 && result[used - 1] == '\n') result[used - 1] = '\0';
     return result;
 }
-
 
 
 void tr_insert(struct sound_seg* src, struct sound_seg* dest, size_t destpos, size_t srcpos, size_t len) {
