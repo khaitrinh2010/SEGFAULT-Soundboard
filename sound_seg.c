@@ -15,6 +15,7 @@ struct sound_seg_node {
     size_t length_of_the_segment;  // How many samples from this segment
     int16_t* audio_data; //start element in the buffer
     bool owns_data; //if this node should free the memory
+    int ref_count;
 };
 
 struct sound_seg {
@@ -178,11 +179,28 @@ void tr_write(struct sound_seg* track, int16_t* src, size_t pos, size_t len) {
     if (written < len) {
         struct sound_seg_node* last = track->head;
         while (last->next) last = last->next;
-        size_t new_len = pos + len;
-        int16_t* new_data = realloc(last->audio_data, new_len * sizeof(int16_t));
-        if (!new_data) return;
-        for (size_t i = last->length_of_the_segment; i < new_len; i++) {
-            new_data[i] = 0;  // zero padding
+        size_t new_len = pos + (len - written);
+        int16_t* new_data;
+        if (last->audio_data == NULL) {
+            new_data = malloc(new_len * sizeof(int16_t));
+            if (!new_data) return;
+            last->owns_data = true;
+            for (size_t i = 0; i < new_len; i++) {
+                new_data[i] = 0;  // Initialize to zero
+            }
+        } else {
+            struct sound_seg_node* new_node = malloc(sizeof(struct sound_seg_node));
+            last->next = new_node;
+            new_node->next = NULL;
+            new_node->length_of_the_segment = new_len;
+            new_node->ref_count = 0;
+            new_data =  malloc(new_len * sizeof(int16_t));
+            if (!new_data) return;
+            new_node->audio_data = new_data;
+            for (size_t i = 0; i < new_len; i++) {
+                new_node->audio_data[i] = src[written++];
+            }
+            return;
         }
         last->audio_data = new_data;
         last->length_of_the_segment = new_len;
@@ -335,6 +353,16 @@ void read_from_node(struct sound_seg_node* node) {
     }
     printf("\n");
 }
+void read_nodes_from_linked_list(struct sound_seg* track) {
+    int node_id = 1;
+    struct sound_seg_node* current = track->head;
+    while (current != NULL) {
+        printf("Node ID: %d\n", node_id);
+        read_from_node(current);
+        current = current->next;
+        node_id++;
+    }
+}
 
 void tr_insert(struct sound_seg* src, struct sound_seg* dest, size_t destpos, size_t srcpos, size_t len) {
     // int16_t *test = malloc(tr_length(src) * sizeof(int16_t));
@@ -420,10 +448,31 @@ void tr_insert(struct sound_seg* src, struct sound_seg* dest, size_t destpos, si
 
 int main(int argc, char** argv) {
     struct sound_seg* s0 = tr_init();
-    tr_write(s0, ((int16_t[]){-5,2,-14,-9,-1,-3}), 0, 6);
-    tr_insert(s0, s0, 6, 3, 2);
-    tr_write(s0, ((int16_t[]){-5,-5,-5,-5,-5,-5,-5,-5}), 0, 8);
-    tr_write(s0, ((int16_t[]){-6,19,13,-11}), 0, 4);
-    tr_write(s0, ((int16_t[]){-4,14,-13}), 1, 3);
-    tr_write(s0, ((int16_t[]){14,17,14,-7,17}), 5, 5);
+    tr_write(s0, ((int16_t[]){-19,-1,16,14,-14}), 0, 5);
+    struct sound_seg* s1 = tr_init();
+    tr_write(s1, ((int16_t[]){14,13,17,7,17}), 0, 5);
+    struct sound_seg* s2 = tr_init();
+    tr_write(s2, ((int16_t[]){7,-14,-2,17,-18,20,-12,9,15,9,-5,11,-12,1,8,-13,-13,6}), 0, 18);
+    struct sound_seg* s3 = tr_init();
+    tr_write(s3, ((int16_t[]){12,-8,17,-4}), 0, 4);
+    tr_insert(s0, s2, 8, 2, 3);
+    tr_write(s1, ((int16_t[]){-8,4,-8,-8,-8}), 0, 5);
+    tr_write(s2, ((int16_t[]){-13,-10,1,6,11,16,-15,-14,-19,-17,-6,-6,-19,-5,-6,18,-6,15,8,-15,-6}), 0, 21);
+    tr_write(s3, ((int16_t[]){-7}), 0, 1);
+    tr_insert(s3, s3, 1, 0, 3);
+    tr_write(s0, ((int16_t[]){-10,-3,-3,12,-3}), 0, 5);
+     tr_write(s3, ((int16_t[]){-16,9,9,9,9,9,9}), 0, 7);
+     tr_write(s1, ((int16_t[]){-2,15,18,-10,-10}), 0, 5);
+     tr_insert(s3, s2, 15, 6, 1);
+     tr_write(s2, ((int16_t[]){-2,-16,-16,-7,10,-1,6,-16,6,-20,1,10,3,-3,4,-16,12,-11,-16,-4,-2,17}), 0, 22);
+     tr_write(s0, ((int16_t[]){4,-7,-7,-7,-7}), 0, 5);
+     tr_write(s0, ((int16_t[]){-5,5,-4,-1,-15}), 0, 5);
+     tr_delete_range(s0, 0, 1); //expect return True
+     tr_write(s2, ((int16_t[]){-10,18,18}), 1, 3);
+     tr_write(s0, ((int16_t[]){-1,11}), 0, 2);
+     tr_insert(s1, s2, 14, 3, 2);
+     tr_write(s3, ((int16_t[]){16,-17,17,9,-14,-18,14}), 0, 7);
+     tr_write(s1, ((int16_t[]){2,-10,2,14,8}), 0, 5);
+     tr_write(s2, ((int16_t[]){12}), 24, 1);
+    read_nodes_from_linked_list(s2);
 }
