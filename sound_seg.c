@@ -322,6 +322,7 @@ char* tr_identify(const struct sound_seg* target, const struct sound_seg* ad) {
 void tr_insert(struct sound_seg* src, struct sound_seg* dest, size_t destpos, size_t srcpos, size_t len) {
     if (!src || !dest || len == 0) return;
     struct sound_seg_node* cur_src = src->head;
+    cur_src->owns_data = true;
     size_t skipped = 0;
     while (cur_src && skipped + cur_src->length_of_the_segment <= srcpos) {
         skipped += cur_src->length_of_the_segment;
@@ -331,12 +332,10 @@ void tr_insert(struct sound_seg* src, struct sound_seg* dest, size_t destpos, si
     size_t offset = srcpos - skipped;
     if (offset + len > cur_src->length_of_the_segment) return; // Prevent out-of-bounds
     int16_t* shared_ptr = cur_src->audio_data + offset;
-
-
     struct sound_seg_node* src_shared_node = malloc(sizeof(struct sound_seg_node));
     src_shared_node->audio_data = shared_ptr;
     src_shared_node->length_of_the_segment = len;
-    src_shared_node->owns_data = true;
+    src_shared_node->owns_data = false;
     src_shared_node->next = cur_src->next;
     cur_src->next = src_shared_node;
     src->total_number_of_segments++;
@@ -367,17 +366,19 @@ void tr_insert(struct sound_seg* src, struct sound_seg* dest, size_t destpos, si
 
 int main(int argc, char** argv) {
     struct sound_seg* s0 = tr_init();
-    tr_write(s0, ((int16_t[]){-1,8,-10,7,13,0,0,6,5,-14,3,13,-9,12,12,-1}), 0, 16);
+    tr_write(s0, ((int16_t[]){-12,12}), 0, 2);
     struct sound_seg* s1 = tr_init();
-    tr_write(s1, ((int16_t[]){-12,9,11,2,1}), 0, 5);
+    tr_write(s1, ((int16_t[]){-6,11,7,-10,4,20,6,14}), 0, 8);
     struct sound_seg* s2 = tr_init();
-    tr_write(s2, ((int16_t[]){-3}), 0, 1);
-    struct sound_seg* s3 = tr_init();
-    tr_write(s3, ((int16_t[]){2}), 0, 1);
-    tr_delete_range(s0, 10, 2); //expect return True
-    size_t FAILING_LEN = tr_length(s0); //expected 14, actual 10
+    tr_write(s2, ((int16_t[]){-17,8,-7,0,-10}), 0, 5);
+    tr_write(s2, ((int16_t[]){17,6,12}), 5, 3);
+    tr_write(s1, ((int16_t[]){5}), 8, 1);
+    tr_write(s2, ((int16_t[]){10,-7,17,17,17,15,3,17}), 0, 8);
+    tr_write(s1, ((int16_t[]){19,-10,-16,-10,-6}), 9, 5);
+    tr_insert(s0, s0, 1, 0, 1);
+    tr_write(s2, ((int16_t[]){18,20,-8,-12,-10,-20,7,17}), 0, 8);
+    tr_write(s0, ((int16_t[]){14,15,-5}), 0, 3);
+    tr_write(s1, ((int16_t[]){-5,11,-18,5,3,-14,-9,-8,-15,0,-12,15,11,-17}), 0, 14);
+    size_t FAILING_LEN = tr_length(s0); //expected 3, actual 4
     tr_destroy(s0);
-    tr_destroy(s1);
-    tr_destroy(s2);
-    tr_destroy(s3);
 }
