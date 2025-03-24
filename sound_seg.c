@@ -99,6 +99,9 @@ struct sound_seg* tr_init() {
     node->next = NULL;
     node->length_of_the_segment = 0;
     node->audio_data = NULL;
+    node->ref_count = 0;
+    node->owns_data = false;
+    node->parent_node = NULL;
 
     struct sound_seg *seg = (struct sound_seg *)malloc(sizeof(struct sound_seg));
     seg->head = node;
@@ -357,6 +360,8 @@ void tr_insert(struct sound_seg* src, struct sound_seg* dest, size_t destpos, si
         before->length_of_the_segment = offset;
         before->owns_data = (before->audio_data == src->head->audio_data);
         before->next = cur_src;
+        before->ref_count  = 0;
+        before->parent_node = NULL;
         cur_src->audio_data += offset;
         cur_src->length_of_the_segment -= offset;
         cur_src->owns_data = false;
@@ -377,6 +382,8 @@ void tr_insert(struct sound_seg* src, struct sound_seg* dest, size_t destpos, si
         after->length_of_the_segment = cur_src->length_of_the_segment - len;
         after->owns_data = false;
         after->next = cur_src->next;
+        after->ref_count  = 0;
+        after->parent_node = NULL;
         cur_src->length_of_the_segment = len;
         cur_src->next = after;
         src->total_number_of_segments++;
@@ -420,13 +427,92 @@ void tr_insert(struct sound_seg* src, struct sound_seg* dest, size_t destpos, si
     }
     dest->total_number_of_segments++;
 }
+void print_track_metadata(struct sound_seg* track, const char* track_name) {
+    if (!track) {
+        printf("{ \"error\": \"Track is NULL\" }\n");
+        return;
+    }
+
+    printf("{\n");
+    printf("  \"track_name\": \"%s\",\n", track_name);
+    printf("  \"total_number_of_segments\": %zu,\n", track->total_number_of_segments);
+    printf("  \"segments\": [\n");
+
+    struct sound_seg_node* node = track->head;
+    int index = 0;
+    while (node) {
+        printf("    {\n");
+        printf("      \"segment_index\": %d,\n", index);
+        printf("      \"length_of_the_segment\": %zu,\n", node->length_of_the_segment);
+        printf("      \"owns_data\": %s,\n", node->owns_data ? "true" : "false");
+        printf("      \"ref_count\": %d,\n", node->ref_count);
+        printf("      \"audio_data\": [");
+        for (size_t i = 0; i < node->length_of_the_segment; i++) {
+            printf("%d", node->audio_data[i]);
+            if (i != node->length_of_the_segment - 1) printf(", ");
+        }
+        printf("],\n");
+        if (node->parent_node != NULL) {
+            printf("      \"parent\": {\n");
+            printf("        \"length_of_the_segment\": %zu,\n", node->parent_node->length_of_the_segment);
+            printf("        \"ref_count\": %d\n", node->parent_node->ref_count);
+            printf("      }\n");
+        } else {
+            printf("      \"parent\": null\n");
+        }
+
+        printf("    }");
+        node = node->next;
+        if (node) printf(",");
+        printf("\n");
+        index++;
+    }
+    printf("  ]\n");
+    printf("}\n");
+}
+
 
 int main(int argc, char** argv) {
     struct sound_seg* s0 = tr_init();
-    tr_write(s0, ((int16_t[]){3,13,-7,-7,6,-14,17}), 0, 7);
-    tr_insert(s0, s0, 7, 4, 1);
-    tr_write(s0, ((int16_t[]){7,-12,19,-4,17,1,18,7}), 0, 8);
-    bool ans = tr_delete_range(s0, 4, 2); //expect return False
+    tr_write(s0, ((int16_t[]){-7,-15,-17,6,-3,-8,17}), 0, 7);
+    struct sound_seg* s1 = tr_init();
+    tr_write(s1, ((int16_t[]){-7,1,6}), 0, 3);
+    struct sound_seg* s2 = tr_init();
+    tr_write(s2, ((int16_t[]){-17,-8,1,-7,-2,-16}), 0, 6);
+    struct sound_seg* s3 = tr_init();
+    tr_write(s3, ((int16_t[]){-12,20}), 0, 2);
+    struct sound_seg* s4 = tr_init();
+    tr_write(s4, ((int16_t[]){0,12,14}), 0, 3);
+    tr_delete_range(s1, 1, 1); //expect return True
+    tr_insert(s2, s2, 6, 2, 4);
+    tr_write(s3, ((int16_t[]){-18,15}), 0, 2);
+    tr_write(s1, ((int16_t[]){-18,-8}), 0, 2);
+    tr_write(s4, ((int16_t[]){6,6,-18}), 0, 3);
+    tr_write(s0, ((int16_t[]){-10,-19,3,5,6,1,-7}), 0, 7);
+    tr_delete_range(s3, 0, 1); //expect return True
+    tr_insert(s0, s0, 5, 4, 1);
+    tr_write(s0, ((int16_t[]){8,17,-18,-20,19,-2,-13,6}), 0, 8);
+    tr_write(s1, ((int16_t[]){-20,-2}), 0, 2);
+    tr_write(s2, ((int16_t[]){11,0,14,-14,19,14,-4,15,8,6}), 0, 10);
+    tr_write(s4, ((int16_t[]){-11,9,8}), 0, 3);
+    tr_write(s3, ((int16_t[]){16}), 0, 1);
+    tr_insert(s1, s3, 0, 0, 2);
+    tr_write(s3, ((int16_t[]){3,19,-17}), 0, 3);
+    tr_write(s0, ((int16_t[]){-8,14,-10,12,-19,-7,-13,-15}), 0, 8);
+    tr_insert(s4, s2, 1, 1, 1);
+
+    tr_write(s2, ((int16_t[]){-4,-8,12,14,-9,-13,19,15,12,-6,-16}), 0, 11);
+
+    tr_write(s1, ((int16_t[]){5,-12}), 0, 2);
+    tr_write(s0, ((int16_t[]){-7,-15,12,-1,-17,-15,-10,-17}), 0, 8);
+    tr_write(s4, ((int16_t[]){6,11,-3}), 0, 3);
+
+    bool ans = tr_delete_range(s4, 1, 1); //expect return False
     printf("%d\n", ans);
+    //expected False, actual True
     tr_destroy(s0);
+    tr_destroy(s1);
+    tr_destroy(s2);
+    tr_destroy(s3);
+    tr_destroy(s4);
 }
