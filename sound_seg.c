@@ -144,15 +144,15 @@ void tr_read(struct sound_seg* track, int16_t* dest, size_t pos, size_t len) {
         skipped += current->length_of_the_segment;
         current = current->next;
     }
-    for (size_t i = 0; i < len; i++) {
-        printf("%d ", dest[i]);
-    }
-    printf("\n");
+    // for (size_t i = 0; i < len; i++) {
+    //     printf("%d ", dest[i]);
+    // }
+    // printf("\n");
 }
 
 void tr_write(struct sound_seg* track, int16_t* src, size_t pos, size_t len) {
-    int16_t* test = (int16_t*)malloc(sizeof(int16_t) * tr_length(track));
-    tr_read(track, test, 0, tr_length(track));
+    // int16_t* test = (int16_t*)malloc(sizeof(int16_t) * tr_length(track));
+    // tr_read(track, test, 0, tr_length(track));
     size_t skipped = 0, written = 0;
     struct sound_seg_node* cur = track->head;
 
@@ -337,11 +337,10 @@ void read_from_node(struct sound_seg_node* node) {
 }
 
 void tr_insert(struct sound_seg* src, struct sound_seg* dest, size_t destpos, size_t srcpos, size_t len) {
-    int16_t *test = malloc(tr_length(src) * sizeof(int16_t));
-    tr_read(src, test, 0, tr_length(src));
-    free(test);
+    // int16_t *test = malloc(tr_length(src) * sizeof(int16_t));
+    // tr_read(src, test, 0, tr_length(src));
+    // free(test);
     if (!src || !dest || len == 0) return;
-    printf("Starting tr_insert: srcpos=%zu, destpos=%zu, len=%zu\n", srcpos, destpos, len);
     struct sound_seg_node* cur_src = src->head;
     size_t skipped = 0;
     cur_src->owns_data = true;
@@ -351,7 +350,6 @@ void tr_insert(struct sound_seg* src, struct sound_seg* dest, size_t destpos, si
     }
     size_t offset = srcpos - skipped;
     int16_t* shared_ptr = cur_src->audio_data + offset;
-    printf("Shared data starts at offset %zu with first sample = %d\n", offset, shared_ptr[0]);
     if (offset > 0) {
         struct sound_seg_node* before = malloc(sizeof(struct sound_seg_node));
         before->audio_data = cur_src->audio_data;
@@ -369,9 +367,8 @@ void tr_insert(struct sound_seg* src, struct sound_seg* dest, size_t destpos, si
             walker->next = before;
         }
         src->total_number_of_segments++;
-        read_from_node(before);
-        read_from_node(cur_src);
-        printf("Split src before insert: created 'before' segment with length %zu\n", before->length_of_the_segment);
+        // read_from_node(before);
+        // read_from_node(cur_src);
     }
     if (cur_src->length_of_the_segment > len) {
         struct sound_seg_node* after = malloc(sizeof(struct sound_seg_node));
@@ -382,7 +379,6 @@ void tr_insert(struct sound_seg* src, struct sound_seg* dest, size_t destpos, si
         cur_src->length_of_the_segment = len;
         cur_src->next = after;
         src->total_number_of_segments++;
-        printf("Split src after insert: created 'after' segment with length %zu\n", after->length_of_the_segment);
     }
 
 
