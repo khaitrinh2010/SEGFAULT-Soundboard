@@ -144,9 +144,15 @@ void tr_read(struct sound_seg* track, int16_t* dest, size_t pos, size_t len) {
         skipped += current->length_of_the_segment;
         current = current->next;
     }
+    for (size_t i = 0; i < len; i++) {
+        printf("%d ", dest[i]);
+    }
+    printf("\n");
 }
 
 void tr_write(struct sound_seg* track, int16_t* src, size_t pos, size_t len) {
+    int16_t* test = (int16_t*)malloc(sizeof(int16_t) * tr_length(track));
+    tr_read(track, test, 0, tr_length(track));
     size_t skipped = 0, written = 0;
     struct sound_seg_node* cur = track->head;
 
@@ -319,7 +325,21 @@ char* tr_identify(const struct sound_seg* target, const struct sound_seg* ad) {
     return result;
 }
 
+void read_from_node(struct sound_seg_node* node) {
+    printf("Reading from node...\n");
+    printf("Length of audio data: %zu\n", node->length_of_the_segment);
+    int16_t* audio_data = node->audio_data;
+    size_t len = node->length_of_the_segment;
+    for (size_t i = 0; i < len; i++) {
+        printf("%d ", audio_data[i]);
+    }
+    printf("\n");
+}
+
 void tr_insert(struct sound_seg* src, struct sound_seg* dest, size_t destpos, size_t srcpos, size_t len) {
+    int16_t *test = malloc(tr_length(src) * sizeof(int16_t));
+    tr_read(src, test, 0, tr_length(src));
+    free(test);
     if (!src || !dest || len == 0) return;
     printf("Starting tr_insert: srcpos=%zu, destpos=%zu, len=%zu\n", srcpos, destpos, len);
     struct sound_seg_node* cur_src = src->head;
@@ -329,15 +349,7 @@ void tr_insert(struct sound_seg* src, struct sound_seg* dest, size_t destpos, si
         skipped += cur_src->length_of_the_segment;
         cur_src = cur_src->next;
     }
-    if (!cur_src) {
-        printf("Error: srcpos out of bounds\n");
-        return;
-    }
     size_t offset = srcpos - skipped;
-    if (offset + len > cur_src->length_of_the_segment) {
-        printf("Error: attempted to read past segment boundary\n");
-        return;
-    }
     int16_t* shared_ptr = cur_src->audio_data + offset;
     printf("Shared data starts at offset %zu with first sample = %d\n", offset, shared_ptr[0]);
     if (offset > 0) {
@@ -357,6 +369,8 @@ void tr_insert(struct sound_seg* src, struct sound_seg* dest, size_t destpos, si
             walker->next = before;
         }
         src->total_number_of_segments++;
+        read_from_node(before);
+        read_from_node(cur_src);
         printf("Split src before insert: created 'before' segment with length %zu\n", before->length_of_the_segment);
     }
     if (cur_src->length_of_the_segment > len) {
@@ -365,20 +379,19 @@ void tr_insert(struct sound_seg* src, struct sound_seg* dest, size_t destpos, si
         after->length_of_the_segment = cur_src->length_of_the_segment - len;
         after->owns_data = false;
         after->next = cur_src->next;
-
         cur_src->length_of_the_segment = len;
         cur_src->next = after;
         src->total_number_of_segments++;
-
         printf("Split src after insert: created 'after' segment with length %zu\n", after->length_of_the_segment);
     }
+
+
     struct sound_seg_node* dest_shared = malloc(sizeof(struct sound_seg_node));
     dest_shared->audio_data = cur_src->audio_data;
     dest_shared->length_of_the_segment = len;
     dest_shared->owns_data = false;
     dest_shared->next = NULL;
-    printf("Creating dest-shared node: length = %zu, first sample = %d\n",
-           dest_shared->length_of_the_segment, dest_shared->audio_data[0]);
+    read_from_node(dest_shared);
     struct sound_seg_node* cur_dest = dest->head;
     struct sound_seg_node* prev = NULL;
     size_t skipped_dest = 0;
@@ -387,38 +400,48 @@ void tr_insert(struct sound_seg* src, struct sound_seg* dest, size_t destpos, si
         prev = cur_dest;
         cur_dest = cur_dest->next;
     }
+    if (cur_dest && skipped_dest <= destpos) {
+        size_t relative_offset = destpos - skipped_dest;
+        struct sound_seg_node* after = malloc(sizeof(struct sound_seg_node));
+        after->audio_data = cur_dest->audio_data + relative_offset;
+        after->length_of_the_segment = cur_dest->length_of_the_segment - relative_offset;
+        after->owns_data = false;
+        after->next = cur_dest->next;
+        cur_dest->length_of_the_segment = relative_offset;
+        cur_dest->next = after;
+        dest->total_number_of_segments++;
+        prev = cur_dest;
+        cur_dest = after;
+    }
     if (!prev) {
         dest_shared->next = dest->head;
         dest->head = dest_shared;
-        printf("Inserted dest-shared node at head of dest\n");
     } else {
         dest_shared->next = prev->next;
         prev->next = dest_shared;
-        printf("Inserted dest-shared node after segment with length %zu\n", prev->length_of_the_segment);
     }
     dest->total_number_of_segments++;
-    printf("Final dest segment count = %zu\n", dest->total_number_of_segments);
 }
 
 
 int main(int argc, char** argv) {
     //SEED=503468852
     struct sound_seg* s0 = tr_init();
-    tr_write(s0, ((int16_t[]){14,6,1,-2}), 0, 4);
+    tr_write(s0, ((int16_t[]){-19}), 0, 1);
     struct sound_seg* s1 = tr_init();
-    tr_write(s1, ((int16_t[]){-16,1}), 0, 2);
-    struct sound_seg* s2 = tr_init();
-    tr_write(s2, ((int16_t[]){7,-18,18,-7,-16,14}), 0, 6);
-    struct sound_seg* s3 = tr_init();
-    tr_write(s3, ((int16_t[]){-13,-6,-13,-3,-16,10,9,-20}), 0, 8);
-    tr_insert(s1, s3, 6, 1, 1);
-    tr_write(s3, ((int16_t[]){7,9,-20,14,10,-18,-12,-16,-18}), 0, 9);
-    tr_write(s2, ((int16_t[]){2,16,-4,6,18,-7}), 0, 6);
-    int16_t FAILING_READ[2];
-    tr_read(s1, FAILING_READ, 0, 2);
-    //expected [-16 -12], actual [-16   7]!
+    tr_write(s1, ((int16_t[]){}), 0, 0);
+    tr_write(s1, ((int16_t[]){14,-4,-7}), 0, 3);
+    tr_write(s0, ((int16_t[]){-5}), 0, 1);
+    tr_delete_range(s1, 1, 1); //expect return True
+    tr_write(s0, ((int16_t[]){2,3,-12}), 1, 3);
+    tr_write(s1, ((int16_t[]){3,3,3,3,3}), 1, 5);
+    tr_delete_range(s1, 1, 2); //expect return True
+    tr_insert(s1, s1, 1, 3, 1);
+    tr_write(s1, ((int16_t[]){18,-17,12,-19,6}), 0, 5);
+    tr_write(s0, ((int16_t[]){19,0,-1,-19}), 0, 4);
+    int16_t FAILING_READ[5];
+    tr_read(s1, FAILING_READ, 0, 5);
+    //expected [ 18   6  12 -19   6], actual [  6 -17  12 -19   6]!
     tr_destroy(s0);
     tr_destroy(s1);
-    tr_destroy(s2);
-    tr_destroy(s3);
 }
