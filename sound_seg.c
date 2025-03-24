@@ -215,16 +215,16 @@ bool tr_delete_range(struct sound_seg* track, size_t pos, size_t len) {
         current->length_of_the_segment -= to_delete;
         len -= to_delete;
         skipped = seg_end;
-        if (current->length_of_the_segment == 0 && current != track->head) {
-            if (prev) prev->next = current->next;
-
-            if (current->owns_data && current->audio_data != NULL) {
-                free(current->audio_data);
-            }
-            free(current);
-            current = (prev) ? prev->next : track->head;
-            track->total_number_of_segments--;
-        }
+        // if (current->length_of_the_segment == 0 && current != track->head) {
+        //     if (prev) prev->next = current->next;
+        //
+        //     if (current->owns_data && current->audio_data != NULL) {
+        //         free(current->audio_data);
+        //     }
+        //     free(current);
+        //     current = (prev) ? prev->next : track->head;
+        //     track->total_number_of_segments--;
+        // }
 
     }
 
