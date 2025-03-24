@@ -178,36 +178,16 @@ void tr_write(struct sound_seg* track, int16_t* src, size_t pos, size_t len) {
         struct sound_seg_node* last = track->head;
         while (last->next) last = last->next;
         size_t new_len = pos + len;
-        // int16_t* new_data = realloc(last->audio_data, new_len * sizeof(int16_t));
-        if (!last->owns_data) {
-            // Allocate a fresh buffer so we don’t modify shared memory
-            int16_t* new_data = malloc(new_len * sizeof(int16_t));
-            if (!new_data) return;
-            memcpy(new_data, last->audio_data, last->length_of_the_segment * sizeof(int16_t));
-            for (size_t i = last->length_of_the_segment; i < new_len; i++) {
-                new_data[i] = 0;
-            }
-            last->audio_data = new_data;
-            last->owns_data = true;
-            last->length_of_the_segment = new_len;
-        } else {
-            int16_t* new_data = realloc(last->audio_data, new_len * sizeof(int16_t));
-            if (!new_data) return;
-            for (size_t i = last->length_of_the_segment; i < new_len; i++) {
-                new_data[i] = 0;
-            }
-            last->audio_data = new_data;
-            last->length_of_the_segment = new_len;
+        int16_t* new_data = realloc(last->audio_data, new_len * sizeof(int16_t));
+        if (!new_data) return;
+        for (size_t i = last->length_of_the_segment; i < new_len; i++) {
+            new_data[i] = 0;  // zero padding
         }
-        // if (!new_data) return;
-        // for (size_t i = last->length_of_the_segment; i < new_len; i++) {
-        //     new_data[i] = 0;  // zero padding
-        // }
-        // last->audio_data = new_data;
-        // last->length_of_the_segment = new_len;
-        // for (; written < len; written++) {
-        //     last->audio_data[pos + written] = src[written];
-        // }
+        last->audio_data = new_data;
+        last->length_of_the_segment = new_len;
+        for (; written < len; written++) {
+            last->audio_data[pos + written] = src[written];
+        }
     }
 }
 
