@@ -153,6 +153,7 @@ void tr_read(struct sound_seg* track, int16_t* dest, size_t pos, size_t len) {
 void tr_write(struct sound_seg* track, int16_t* src, size_t pos, size_t len) {
     // int16_t* test = (int16_t*)malloc(sizeof(int16_t) * tr_length(track));
     // tr_read(track, test, 0, tr_length(track));
+    // free(test);
     size_t skipped = 0, written = 0;
     struct sound_seg_node* cur = track->head;
 
@@ -379,8 +380,6 @@ void tr_insert(struct sound_seg* src, struct sound_seg* dest, size_t destpos, si
         cur_src->next = after;
         src->total_number_of_segments++;
     }
-
-
     struct sound_seg_node* dest_shared = malloc(sizeof(struct sound_seg_node));
     dest_shared->audio_data = cur_src->audio_data;
     dest_shared->length_of_the_segment = len;
@@ -421,18 +420,10 @@ void tr_insert(struct sound_seg* src, struct sound_seg* dest, size_t destpos, si
 
 int main(int argc, char** argv) {
     struct sound_seg* s0 = tr_init();
-    tr_write(s0, ((int16_t[]){3,12}), 0, 2);
-    struct sound_seg* s1 = tr_init();
-    tr_write(s1, ((int16_t[]){14,-9,8,-14,10,1,-5,-7,-16,-1,-2}), 0, 11);
-    struct sound_seg* s2 = tr_init();
-    tr_write(s2, ((int16_t[]){4}), 0, 1);
-    struct sound_seg* s3 = tr_init();
-    tr_write(s3, ((int16_t[]){-1,-18,-13,-9,-3,11}), 0, 6);
-    struct sound_seg* s4 = tr_init();
-    tr_write(s4, ((int16_t[]){4,-15,11}), 0, 3);
-    tr_insert(s3, s0, 0, 4, 2);
-    tr_write(s3, ((int16_t[]){10,-6,19,-1,20,-14}), 0, 6);
-    tr_write(s2, ((int16_t[]){1}), 0, 1);
-    tr_write(s4, ((int16_t[]){7,16,17}), 0, 3);
-    tr_write(s3, ((int16_t[]){14,5,20,-3,-15}), 2, 5);
+    tr_write(s0, ((int16_t[]){-5,2,-14,-9,-1,-3}), 0, 6);
+    tr_insert(s0, s0, 6, 3, 2);
+    tr_write(s0, ((int16_t[]){-5,-5,-5,-5,-5,-5,-5,-5}), 0, 8);
+    tr_write(s0, ((int16_t[]){-6,19,13,-11}), 0, 4);
+    tr_write(s0, ((int16_t[]){-4,14,-13}), 1, 3);
+    tr_write(s0, ((int16_t[]){14,17,14,-7,17}), 5, 5);
 }
