@@ -321,44 +321,65 @@ char* tr_identify(const struct sound_seg* target, const struct sound_seg* ad) {
 
 void tr_insert(struct sound_seg* src, struct sound_seg* dest, size_t destpos, size_t srcpos, size_t len) {
     if (!src || !dest || len == 0) return;
+
     struct sound_seg_node* cur_src = src->head;
-    cur_src->owns_data = true;
     size_t skipped = 0;
+    cur_src->owns_data = true;
     while (cur_src && skipped + cur_src->length_of_the_segment <= srcpos) {
         skipped += cur_src->length_of_the_segment;
         cur_src = cur_src->next;
     }
     if (!cur_src) return;
     size_t offset = srcpos - skipped;
-    if (offset + len > cur_src->length_of_the_segment) return; // Prevent out-of-bounds
+    if (offset + len > cur_src->length_of_the_segment) return;
     int16_t* shared_ptr = cur_src->audio_data + offset;
-    struct sound_seg_node* src_shared_node = malloc(sizeof(struct sound_seg_node));
-    src_shared_node->audio_data = shared_ptr;
-    src_shared_node->length_of_the_segment = len;
-    src_shared_node->owns_data = false;
-    src_shared_node->next = cur_src->next;
-    cur_src->next = src_shared_node;
-    src->total_number_of_segments++;
-    struct sound_seg_node* dest_shared_node = malloc(sizeof(struct sound_seg_node));
-    dest_shared_node->audio_data = shared_ptr;
-    dest_shared_node->length_of_the_segment = len;
-    dest_shared_node->owns_data = false;
-    dest_shared_node->next = NULL;
+    if (offset > 0) {
+        struct sound_seg_node* before = malloc(sizeof(struct sound_seg_node));
+        before->audio_data = cur_src->audio_data;
+        before->length_of_the_segment = offset;
+        before->owns_data = cur_src->owns_data;
+        before->next = cur_src;
+        cur_src->audio_data = cur_src->audio_data + offset;
+        cur_src->length_of_the_segment -= offset;
+        cur_src->owns_data = false;
+        if (src->head == cur_src) {
+            src->head = before;
+        } else {
+            struct sound_seg_node* walker = src->head;
+            while (walker->next != cur_src) walker = walker->next;
+            walker->next = before;
+        }
+        src->total_number_of_segments++;
+    }
+    if (cur_src->length_of_the_segment > len) {
+        struct sound_seg_node* after = malloc(sizeof(struct sound_seg_node));
+        after->audio_data = cur_src->audio_data + len;
+        after->length_of_the_segment = cur_src->length_of_the_segment - len;
+        after->owns_data = false;
+        after->next = cur_src->next;
+        cur_src->length_of_the_segment = len;
+        cur_src->next = after;
+        src->total_number_of_segments++;
+    }
+    struct sound_seg_node* dest_shared = malloc(sizeof(struct sound_seg_node));
+    dest_shared->audio_data = cur_src->audio_data;
+    dest_shared->length_of_the_segment = len;
+    dest_shared->owns_data = false;
+    dest_shared->next = NULL;
     struct sound_seg_node* cur_dest = dest->head;
-    struct sound_seg_node* prev_dest = NULL;
-    size_t dest_skipped = 0;
-    while (cur_dest && dest_skipped + cur_dest->length_of_the_segment <= destpos) {
-        dest_skipped += cur_dest->length_of_the_segment;
-        prev_dest = cur_dest;
+    struct sound_seg_node* prev = NULL;
+    size_t skipped_dest = 0;
+    while (cur_dest && skipped_dest + cur_dest->length_of_the_segment <= destpos) {
+        skipped_dest += cur_dest->length_of_the_segment;
+        prev = cur_dest;
         cur_dest = cur_dest->next;
     }
-
-    if (!prev_dest) {
-        dest_shared_node->next = dest->head;
-        dest->head = dest_shared_node;
+    if (!prev) {
+        dest_shared->next = dest->head;
+        dest->head = dest_shared;
     } else {
-        dest_shared_node->next = prev_dest->next;
-        prev_dest->next = dest_shared_node;
+        dest_shared->next = prev->next;
+        prev->next = dest_shared;
     }
 
     dest->total_number_of_segments++;
