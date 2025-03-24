@@ -385,8 +385,7 @@ void tr_insert(struct sound_seg* src, struct sound_seg* dest, size_t destpos, si
         dest_shared->next = prev->next;
         prev->next = dest_shared;
     }
-
-    dest->total_number_of_segments++;
+    dest->total_number_of_segments += 2     ;
 }
 
 int main(int argc, char** argv) {
