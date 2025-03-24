@@ -207,6 +207,7 @@ bool tr_delete_range(struct sound_seg* track, size_t pos, size_t len) {
             current = current->next;
             continue;
         }
+        if (current->ref_count > 0) return false;
         size_t offset = (pos > skipped) ? pos - skipped : 0;
         size_t deletable = current->length_of_the_segment - offset;
         size_t to_delete = (len < deletable) ? len : deletable;
@@ -226,9 +227,7 @@ bool tr_delete_range(struct sound_seg* track, size_t pos, size_t len) {
             current = (prev) ? prev->next : track->head;
             track->total_number_of_segments--;
         }
-
     }
-
     return true;
 }
 
@@ -424,18 +423,10 @@ void tr_insert(struct sound_seg* src, struct sound_seg* dest, size_t destpos, si
 
 int main(int argc, char** argv) {
     struct sound_seg* s0 = tr_init();
-    tr_write(s0, ((int16_t[]){}), 0, 0);
-    struct sound_seg* s1 = tr_init();
-    tr_write(s1, ((int16_t[]){10,0,-15,9,5,10,19,-8}), 0, 8);
-    struct sound_seg* s2 = tr_init();
-    tr_write(s2, ((int16_t[]){-2,-13,3}), 0, 3);
-    struct sound_seg* s3 = tr_init();
-    tr_write(s3, ((int16_t[]){-18,6,-15,4,-2,6,-11}), 0, 7);
-    struct sound_seg* s4 = tr_init();
-    tr_write(s4, ((int16_t[]){9,-1}), 0, 2);
-    tr_write(s1, ((int16_t[]){20,13}), 3, 2);
-    tr_write(s3, ((int16_t[]){4}), 4, 1);
-    tr_insert(s3, s2, 3, 0, 1);
-    tr_write(s1, ((int16_t[]){-1,-12,-12,10,9,-12,-12,-12}), 0, 8);
-    tr_write(s3, ((int16_t[]){2,5,-4,5,-17}), 6, 5);
+    tr_write(s0, ((int16_t[]){3,13,-7,-7,6,-14,17}), 0, 7);
+    tr_insert(s0, s0, 7, 4, 1);
+    tr_write(s0, ((int16_t[]){7,-12,19,-4,17,1,18,7}), 0, 8);
+    bool ans = tr_delete_range(s0, 4, 2); //expect return False
+    printf("%d\n", ans);
+    tr_destroy(s0);
 }
