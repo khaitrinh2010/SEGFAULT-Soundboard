@@ -386,7 +386,7 @@ void tr_insert(struct sound_seg* src, struct sound_seg* dest, size_t destpos, si
     dest_shared->length_of_the_segment = len;
     dest_shared->owns_data = false;
     dest_shared->next = NULL;
-    read_from_node(dest_shared);
+    //om_node(dest_shared);
     struct sound_seg_node* cur_dest = dest->head;
     struct sound_seg_node* prev = NULL;
     size_t skipped_dest = 0;
@@ -420,23 +420,19 @@ void tr_insert(struct sound_seg* src, struct sound_seg* dest, size_t destpos, si
 
 
 int main(int argc, char** argv) {
-    //SEED=503468852
     struct sound_seg* s0 = tr_init();
-    tr_write(s0, ((int16_t[]){-19}), 0, 1);
+    tr_write(s0, ((int16_t[]){3,12}), 0, 2);
     struct sound_seg* s1 = tr_init();
-    tr_write(s1, ((int16_t[]){}), 0, 0);
-    tr_write(s1, ((int16_t[]){14,-4,-7}), 0, 3);
-    tr_write(s0, ((int16_t[]){-5}), 0, 1);
-    tr_delete_range(s1, 1, 1); //expect return True
-    tr_write(s0, ((int16_t[]){2,3,-12}), 1, 3);
-    tr_write(s1, ((int16_t[]){3,3,3,3,3}), 1, 5);
-    tr_delete_range(s1, 1, 2); //expect return True
-    tr_insert(s1, s1, 1, 3, 1);
-    tr_write(s1, ((int16_t[]){18,-17,12,-19,6}), 0, 5);
-    tr_write(s0, ((int16_t[]){19,0,-1,-19}), 0, 4);
-    int16_t FAILING_READ[5];
-    tr_read(s1, FAILING_READ, 0, 5);
-    //expected [ 18   6  12 -19   6], actual [  6 -17  12 -19   6]!
-    tr_destroy(s0);
-    tr_destroy(s1);
+    tr_write(s1, ((int16_t[]){14,-9,8,-14,10,1,-5,-7,-16,-1,-2}), 0, 11);
+    struct sound_seg* s2 = tr_init();
+    tr_write(s2, ((int16_t[]){4}), 0, 1);
+    struct sound_seg* s3 = tr_init();
+    tr_write(s3, ((int16_t[]){-1,-18,-13,-9,-3,11}), 0, 6);
+    struct sound_seg* s4 = tr_init();
+    tr_write(s4, ((int16_t[]){4,-15,11}), 0, 3);
+    tr_insert(s3, s0, 0, 4, 2);
+    tr_write(s3, ((int16_t[]){10,-6,19,-1,20,-14}), 0, 6);
+    tr_write(s2, ((int16_t[]){1}), 0, 1);
+    tr_write(s4, ((int16_t[]){7,16,17}), 0, 3);
+    tr_write(s3, ((int16_t[]){14,5,20,-3,-15}), 2, 5);
 }
