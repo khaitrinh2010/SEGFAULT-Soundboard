@@ -589,7 +589,7 @@ void handle_self_insert_overlap(struct sound_seg* src, struct sound_seg* dest, s
 
     // Case 1: srcpos < destpos < srcpos + len
     if (srcpos < destpos && destpos < srcpos + len) {
-        size_t before_src_len = srcpos;                // Before srcpos
+        size_t before_src_len = src_offset;                // Before srcpos
         size_t src_to_dest_len = destpos - srcpos;     // srcpos to destpos-1
         size_t dest_to_end_len = len - src_to_dest_len; // destpos to end of inserted segment
 
@@ -681,8 +681,8 @@ void handle_self_insert_overlap(struct sound_seg* src, struct sound_seg* dest, s
         node5->next = NULL;
 
         // Set node4 as parent of node5
-        node4->ref_count = 1;
-        node5->parent_node = node4;
+        node5->ref_count = 1;
+        node4->parent_node = node5;
 
         // Update linked list
         if (src_prev) {
