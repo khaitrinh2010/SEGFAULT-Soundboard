@@ -763,9 +763,23 @@ void tr_insert(struct sound_seg* src, struct sound_seg* dest, size_t destpos, si
 
 int main(int argc, char** argv) {
     struct sound_seg* s0 = tr_init();
-    tr_write(s0, ((int16_t[]){20,-16,1,-5,-15}), 0, 5);
-    tr_insert(s0, s0, 4, 1, 4);
-    //print_track_metadata(s0, "track");
-    tr_write(s0, ((int16_t[]){3,-16,-16,6,15,11,2,-9,0}), 0, 9);
-    //print_track_metadata(s0, "track");
+    tr_write(s0, ((int16_t[]){-18,3,11,-1,4}), 0, 5);
+    struct sound_seg* s1 = tr_init();
+    tr_write(s1, ((int16_t[]){}), 0, 0);
+    struct sound_seg* s2 = tr_init();
+    tr_write(s2, ((int16_t[]){5,12,14,-5,-8,9,-14,2,-13,-20,15,2,-17,10,19,5,0,-2,-4,13,-16,6,13,-10,15,11,9,20,10,-10,13,-16}), 0, 32);
+    struct sound_seg* s3 = tr_init();
+    tr_write(s3, ((int16_t[]){-17,10,0,17,12}), 0, 5);
+    struct sound_seg* s4 = tr_init();
+    tr_write(s4, ((int16_t[]){}), 0, 0);
+    tr_insert(s0, s1, 0, 0, 2);
+    tr_write(s3, ((int16_t[]){-17,9,15,19,13}), 0, 5);
+    tr_write(s0, ((int16_t[]){-12,-10,-3,3,13}), 0, 5);
+    tr_write(s1, ((int16_t[]){-3,9}), 0, 2);
+    tr_write(s2, ((int16_t[]){-12,2,9,9,9,9,9,9,9,9,9,9,9,9,9,9,-10,9,9,9,9,9,9,-20,9,9,9,-13,13,-7,9,9}), 0, 32);
+    tr_write(s1, ((int16_t[]){-14,-12}), 1, 2);
+    tr_write(s1, ((int16_t[]){-4,4,-19}), 3, 3);
+    tr_write(s1, ((int16_t[]){-10,10,14,-3,-13}), 3, 5);
+    tr_insert(s1, s2, 27, 3, 3);
+    tr_write(s0, ((int16_t[]){-11,-2,-12,2,8}), 0, 5);
 }
