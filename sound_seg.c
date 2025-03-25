@@ -634,15 +634,15 @@ void print_track_metadata(struct sound_seg* track, const char* track_name) {
 
 
 int main(int argc, char** argv) {
-    struct sound_seg* s0 = tr_init();
-    tr_write(s0, ((int16_t[]){-18,12}), 0, 2);
-    tr_insert(s0, s0, 0, 1, 1);
-
-    tr_write(s0, ((int16_t[]){1,7,-19}), 0, 3);
-
-    tr_write(s0, ((int16_t[]){17,-12,3,-19}), 2, 4);
-    print_track_metadata(s0, "Track");
-    size_t FAILING_LEN = tr_length(s0); //expected 6, actual 8
-    printf("Track length: %zu\n", FAILING_LEN);
-    tr_destroy(s0);
+    // struct sound_seg* s0 = tr_init();
+    // tr_write(s0, ((int16_t[]){-8,3,-18,-7,0}), 0, 5);
+    // tr_write(s0, ((int16_t[]){8,20,-14,5,15}), 0, 5);
+    // tr_write(s0, ((int16_t[]){14}), 3, 1);
+    // tr_write(s0, ((int16_t[]){-20,11,-6,9,14}), 1, 5);
+    // tr_insert(s0, s0, 5, 3, 1);
+    // tr_write(s0, ((int16_t[]){-15,13,11,14,13,-5,4}), 0, 7);
+    // tr_write(s0, ((int16_t[]){-13}), 4, 1);
+    // print_track_metadata(s0, "track");
+    // //
+    // //tr_delete_range(s0, 0, 5); //expect return False
 }
