@@ -612,7 +612,7 @@ void handle_self_insert(struct sound_seg* src, struct sound_seg* dest, size_t de
     if (current->owns_data && current->ref_count == 0) {
         free(current->audio_data);
     }
-    //free(current);
+    free(current);
     print_track_metadata(dest, "dest");
 }
 
