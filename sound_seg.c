@@ -437,7 +437,7 @@ void handle_self_insert(struct sound_seg* src, struct sound_seg* dest, size_t de
         if (src_after) { free(src_after->audio_data); free(src_after); }
         return;
     }
-    new_node->audio_data = malloc(len * sizeof(int16_t));
+    new_node->audio_data = middle->audio_data;
     if (!new_node->audio_data) {
         if (src_before) { free(src_before->audio_data); free(src_before); }
         if (middle) { free(middle->audio_data); free(middle); }
@@ -447,7 +447,7 @@ void handle_self_insert(struct sound_seg* src, struct sound_seg* dest, size_t de
     }
     memcpy(new_node->audio_data, middle->audio_data, len * sizeof(int16_t));
     new_node->length_of_the_segment = len;
-    new_node->owns_data = true;
+    new_node->owns_data = false;
     new_node->ref_count = 0;
     new_node->parent_node = middle;
     new_node->next = NULL;
@@ -739,17 +739,15 @@ void print_track_metadata(struct sound_seg* track, const char* track_name) {
 }
 
 int main(int argc, char** argv) {
-    // struct sound_seg* s0 = tr_init();
-    // tr_write(s0, ((int16_t[]){-6}), 0, 1);
-    // struct sound_seg* s1 = tr_init();
-    // tr_write(s1, ((int16_t[]){-4}), 0, 1);
-    // struct sound_seg* s2 = tr_init();
-    // tr_write(s2, ((int16_t[]){3,12,-1}), 0, 3);
-    // tr_write(s2, ((int16_t[]){-18}), 3, 1);
-    // tr_insert(s1, s2, 4, 0, 1);
-    // tr_write(s0, ((int16_t[]){11}), 0, 1);
-    // tr_write(s2, ((int16_t[]){1,-17,6,3,2}), 0, 5);
-    // tr_write(s1, ((int16_t[]){0}), 0, 1);
-    // tr_write(s2, ((int16_t[]){-20,-11}), 1, 2);
-    // tr_write(s1, ((int16_t[]){-2}), 1, 1);
+    struct sound_seg* s0 = tr_init();
+    tr_write(s0, ((int16_t[]){-6}), 0, 1);
+    tr_insert(s0, s0, 1, 0, 1);
+
+    tr_write(s0, ((int16_t[]){-17,19}), 0, 2);
+
+    print_track_metadata(s0, "track");
+    int16_t FAILING_READ[2];
+    tr_read(s0, FAILING_READ, 0, 2);
+    //expected [19 19], actual [-17  19]!
+    tr_destroy(s0);
 }
