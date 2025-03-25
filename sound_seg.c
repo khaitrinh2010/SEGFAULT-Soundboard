@@ -190,10 +190,7 @@ void tr_write(struct sound_seg* track, int16_t* src, size_t pos, size_t len) {
             walk = walk->next;
         }
         size_t rel_pos = (pos > last_offset) ? pos - last_offset : 0;
-        size_t offset = 0;
-        if (pos > last_offset) {
-            offset = pos - last_offset;
-        }
+        size_t offset = pos - last_offset;
         size_t required_len = offset + len;
         if (required_len > last->length_of_the_segment) {
             int16_t* new_data = realloc(last->audio_data, required_len * sizeof(int16_t));
@@ -207,6 +204,7 @@ void tr_write(struct sound_seg* track, int16_t* src, size_t pos, size_t len) {
             last->length_of_the_segment = required_len;
         }
 
+        //NOTICEABLE
         for (; written < len; written++) {
             last->audio_data[rel_pos + written] = src[written];
         }
@@ -741,16 +739,17 @@ void print_track_metadata(struct sound_seg* track, const char* track_name) {
 }
 
 int main(int argc, char** argv) {
-    // //SEED=2650242207
     // struct sound_seg* s0 = tr_init();
-    // tr_write(s0, ((int16_t[]){10,19,5,-12,-16,-6,-12,-7,16,-14,16,-12,6}), 0, 13);
-    // tr_insert(s0, s0, 10, 7, 4);
-    // print_track_metadata(s0, "track");
-    // tr_write(s0, ((int16_t[]){-15,20,7,-9,-3,7,12,11,0,12,-4,-5,13,1,6,-13,2}), 0, 17);
-    // int16_t FAILING_READ[17];
-    // tr_read(s0, FAILING_READ, 0, 17);
-    // //expected [-15  20   7  -9  -3   7  12  -4  -5  13  -4  -5  13   6   6 -13   2], actual [-15  20   7  -9  -3   7  12  11   0  12  -4  -5  13   1   6 -13   2]!
-    // tr_destroy(s0);
-    // //LEAK: malloc (236 bytes) and free (210 bytes) does not match!
-    // //LEAK occured in at least one generated example.
+    // tr_write(s0, ((int16_t[]){-6}), 0, 1);
+    // struct sound_seg* s1 = tr_init();
+    // tr_write(s1, ((int16_t[]){-4}), 0, 1);
+    // struct sound_seg* s2 = tr_init();
+    // tr_write(s2, ((int16_t[]){3,12,-1}), 0, 3);
+    // tr_write(s2, ((int16_t[]){-18}), 3, 1);
+    // tr_insert(s1, s2, 4, 0, 1);
+    // tr_write(s0, ((int16_t[]){11}), 0, 1);
+    // tr_write(s2, ((int16_t[]){1,-17,6,3,2}), 0, 5);
+    // tr_write(s1, ((int16_t[]){0}), 0, 1);
+    // tr_write(s2, ((int16_t[]){-20,-11}), 1, 2);
+    // tr_write(s1, ((int16_t[]){-2}), 1, 1);
 }
