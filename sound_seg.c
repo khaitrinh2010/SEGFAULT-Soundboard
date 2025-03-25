@@ -357,9 +357,6 @@ void read_from_node(struct sound_seg_node* node) {
     printf("\n");
 }
 void handle_self_insert(struct sound_seg* src, struct sound_seg* dest, size_t destpos, size_t srcpos, size_t len) {
-    if (!src || !dest || len == 0 || src != dest) return;
-
-    // Step 1: Find and split the source node
     struct sound_seg_node* src_node = src->head;
     struct sound_seg_node* src_prev = NULL;
     size_t skipped = 0;
@@ -368,7 +365,6 @@ void handle_self_insert(struct sound_seg* src, struct sound_seg* dest, size_t de
         src_prev = src_node;
         src_node = src_node->next;
     }
-    if (!src_node || srcpos - skipped + len > src_node->length_of_the_segment) return;
 
     size_t src_offset = srcpos - skipped;
     struct sound_seg_node* src_before = NULL;
@@ -403,9 +399,12 @@ void handle_self_insert(struct sound_seg* src, struct sound_seg* dest, size_t de
     memcpy(middle->audio_data, src_node->audio_data + src_offset, middle_len * sizeof(int16_t));
     middle->length_of_the_segment = middle_len;
     middle->owns_data = true;
-    middle->ref_count = 1;  // Protect the source middle part
+    middle->ref_count = 1;
     middle->parent_node = NULL;
     middle->next = NULL;
+    if (src_before) {
+        src_before->next = middle;
+    }
 
     size_t remaining = src_node->length_of_the_segment - (src_offset + len);
     if (remaining > 0) {
@@ -452,10 +451,9 @@ void handle_self_insert(struct sound_seg* src, struct sound_seg* dest, size_t de
     new_node->length_of_the_segment = len;
     new_node->owns_data = true;
     new_node->ref_count = 0;
-    new_node->parent_node = middle;  // Link to source middle
+    new_node->parent_node = middle;
     new_node->next = NULL;
 
-    // Step 3: Link the source split
     if (src_prev) {
         src_prev->next = src_before ? src_before : middle;
     } else {
@@ -472,12 +470,11 @@ void handle_self_insert(struct sound_seg* src, struct sound_seg* dest, size_t de
         src->total_number_of_segments++;
     }
 
-    // Clean up original src_node
-    if (src_node->owns_data && src_node->ref_count == 0) free(src_node->audio_data);
+    //FREE
+    free(src_node->audio_data);
     free(src_node);
 
-    // Step 4: Find and split the destination node
-    struct sound_seg_node* current = dest->head;  // Since src == dest, re-traverse
+    struct sound_seg_node* current = dest->head;
     struct sound_seg_node* prev = NULL;
     skipped = 0;
     while (current && skipped + current->length_of_the_segment <= destpos) {
@@ -517,7 +514,6 @@ void handle_self_insert(struct sound_seg* src, struct sound_seg* dest, size_t de
         dest_before->parent_node = NULL;
         dest_before->next = NULL;
     }
-
     size_t dest_remaining = current->length_of_the_segment - dest_offset;
     if (dest_remaining > 0) {
         dest_after = malloc(sizeof(struct sound_seg_node));
@@ -543,7 +539,6 @@ void handle_self_insert(struct sound_seg* src, struct sound_seg* dest, size_t de
         dest_after->next = NULL;
     }
 
-    // Step 5: Link the destination split
     if (prev) prev->next = dest_before ? dest_before : new_node;
     else dest->head = dest_before ? dest_before : new_node;
     if (dest_before) {
@@ -557,8 +552,8 @@ void handle_self_insert(struct sound_seg* src, struct sound_seg* dest, size_t de
         dest->total_number_of_segments++;
     }
 
-    // Clean up original dest node
-    if (current->owns_data && current->ref_count == 0) free(current->audio_data);
+    //FREE
+    free(current->audio_data);
     free(current);
 }
 
@@ -579,7 +574,7 @@ void tr_insert(struct sound_seg* src, struct sound_seg* dest, size_t destpos, si
     size_t src_offset = srcpos - skipped_src;
     int16_t* segment_start = src_node->audio_data + src_offset;
     size_t src_remaining = src_node->length_of_the_segment - src_offset;
-    if (src_remaining < len) return;
+    if (src_remaining < len) return; // HANDLE LATER
     struct sound_seg_node* src_before = NULL;
     if (src_offset > 0) {
         src_before = malloc(sizeof(struct sound_seg_node));
@@ -596,7 +591,7 @@ void tr_insert(struct sound_seg* src, struct sound_seg* dest, size_t destpos, si
     memcpy(middle_src_segment->audio_data, segment_start, len * sizeof(int16_t));
     middle_src_segment->length_of_the_segment = len;
     middle_src_segment->owns_data = true;
-    middle_src_segment->ref_count = 0;
+    middle_src_segment->ref_count = 1;
     middle_src_segment->parent_node = NULL;
 
     struct sound_seg_node* src_after = NULL;
@@ -631,10 +626,13 @@ void tr_insert(struct sound_seg* src, struct sound_seg* dest, size_t destpos, si
         src_after->next = src_node->next;
         src->total_number_of_segments++;
     }
-    if (src_node->owns_data && src_node->parent_node == NULL && src_node->ref_count == 0) {
-        free(src_node->audio_data);
-    }
+
+
+    //FREE
+    free(src_node->audio_data);
     free(src_node);
+
+
     struct sound_seg_node* shared_with_dest = malloc(sizeof(struct sound_seg_node));
     shared_with_dest->audio_data = middle_src_segment->audio_data;
     shared_with_dest->length_of_the_segment = len;
@@ -697,9 +695,9 @@ void tr_insert(struct sound_seg* src, struct sound_seg* dest, size_t destpos, si
         dest_after->next = dest_node->next;
         dest->total_number_of_segments++;
     }
-    if (dest_node->owns_data && dest_node->parent_node == NULL && dest_node->ref_count == 0) {
-        free(dest_node->audio_data);
-    }
+
+    //FREE
+    free(dest_node->audio_data);
     free(dest_node);
 }
 
@@ -743,16 +741,16 @@ void print_track_metadata(struct sound_seg* track, const char* track_name) {
 }
 
 int main(int argc, char** argv) {
-    //SEED=2650242207
-    struct sound_seg* s0 = tr_init();
-    tr_write(s0, ((int16_t[]){10,19,5,-12,-16,-6,-12,-7,16,-14,16,-12,6}), 0, 13);
-    tr_insert(s0, s0, 10, 7, 4);
-    print_track_metadata(s0, "track");
-    tr_write(s0, ((int16_t[]){-15,20,7,-9,-3,7,12,11,0,12,-4,-5,13,1,6,-13,2}), 0, 17);
-    int16_t FAILING_READ[17];
-    tr_read(s0, FAILING_READ, 0, 17);
-    //expected [-15  20   7  -9  -3   7  12  -4  -5  13  -4  -5  13   6   6 -13   2], actual [-15  20   7  -9  -3   7  12  11   0  12  -4  -5  13   1   6 -13   2]!
-    tr_destroy(s0);
-    //LEAK: malloc (236 bytes) and free (210 bytes) does not match!
-    //LEAK occured in at least one generated example.
+    // //SEED=2650242207
+    // struct sound_seg* s0 = tr_init();
+    // tr_write(s0, ((int16_t[]){10,19,5,-12,-16,-6,-12,-7,16,-14,16,-12,6}), 0, 13);
+    // tr_insert(s0, s0, 10, 7, 4);
+    // print_track_metadata(s0, "track");
+    // tr_write(s0, ((int16_t[]){-15,20,7,-9,-3,7,12,11,0,12,-4,-5,13,1,6,-13,2}), 0, 17);
+    // int16_t FAILING_READ[17];
+    // tr_read(s0, FAILING_READ, 0, 17);
+    // //expected [-15  20   7  -9  -3   7  12  -4  -5  13  -4  -5  13   6   6 -13   2], actual [-15  20   7  -9  -3   7  12  11   0  12  -4  -5  13   1   6 -13   2]!
+    // tr_destroy(s0);
+    // //LEAK: malloc (236 bytes) and free (210 bytes) does not match!
+    // //LEAK occured in at least one generated example.
 }
