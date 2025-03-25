@@ -571,7 +571,6 @@ void handle_self_insert(struct sound_seg* src, struct sound_seg* dest, size_t de
     free(current);
     print_track_metadata(dest, "dest");
 }
-
 void handle_self_insert_overlap(struct sound_seg* src, struct sound_seg* dest, size_t destpos, size_t srcpos, size_t len) {
     struct sound_seg_node* src_node = src->head;
     struct sound_seg_node* src_prev = NULL;
@@ -586,17 +585,14 @@ void handle_self_insert_overlap(struct sound_seg* src, struct sound_seg* dest, s
     if (!src_node) return;
     size_t src_offset = srcpos - skipped;
     size_t total_len = tr_length(src);
+    if (srcpos + len > total_len || destpos > total_len) return;
 
-    if (srcpos + len > total_len || destpos > total_len) return; // Bounds check
+    // Case 1: srcpos < destpos < srcpos + len
+    if (srcpos < destpos && destpos < srcpos + len) {
+        size_t before_src_len = srcpos;                // Before srcpos
+        size_t src_to_dest_len = destpos - srcpos;     // srcpos to destpos-1
+        size_t dest_to_end_len = len - src_to_dest_len; // destpos to end of inserted segment
 
-    // Determine overlap and segment lengths
-    size_t before_src_len = srcpos; // Before srcpos
-    size_t src_to_dest_len = (srcpos < destpos) ? (destpos - srcpos) : (srcpos - destpos);
-    size_t insert_len = (srcpos < destpos) ? src_to_dest_len : len; // Adjust based on case
-    size_t remaining_len = src_node->length_of_the_segment - src_offset - len;
-
-    // Case 1: srcpos < destpos
-    if (srcpos < destpos) {
         // Node 1: Before srcpos (e.g., [20])
         struct sound_seg_node* node1 = NULL;
         if (before_src_len > 0) {
@@ -612,80 +608,81 @@ void handle_self_insert_overlap(struct sound_seg* src, struct sound_seg* dest, s
             node1->next = NULL;
         }
 
-        // Node 2: srcpos to destpos-1 (e.g., [-16, 1, -5])
-        struct sound_seg_node* node2 = NULL;
-        if (src_to_dest_len > 0) {
-            node2 = malloc(sizeof(struct sound_seg_node));
-            if (!node2) {
-                if (node1) { free(node1->audio_data); free(node1); }
-                return;
-            }
-            node2->audio_data = malloc(src_to_dest_len * sizeof(int16_t));
-            if (!node2->audio_data) {
-                if (node1) { free(node1->audio_data); free(node1); }
-                free(node2);
-                return;
-            }
-            memcpy(node2->audio_data, src_node->audio_data + src_offset, src_to_dest_len * sizeof(int16_t));
-            node2->length_of_the_segment = src_to_dest_len;
-            node2->owns_data = true;
-            node2->ref_count = 1; // Will be parent of node3
-            node2->parent_node = NULL;
-            node2->next = NULL;
+        // Node 2: srcpos to destpos-1 (e.g., [-16, 1, -5]), parent
+        struct sound_seg_node* node2 = malloc(sizeof(struct sound_seg_node));
+        if (!node2) {
+            if (node1) { free(node1->audio_data); free(node1); }
+            return;
         }
+        node2->audio_data = malloc(src_to_dest_len * sizeof(int16_t));
+        if (!node2->audio_data) {
+            if (node1) { free(node1->audio_data); free(node1); }
+            free(node2);
+            return;
+        }
+        memcpy(node2->audio_data, src_node->audio_data + src_offset, src_to_dest_len * sizeof(int16_t));
+        node2->length_of_the_segment = src_to_dest_len;
+        node2->owns_data = true;
+        node2->ref_count = 1; // Parent of node3
+        node2->parent_node = NULL;
+        node2->next = NULL;
 
-        // Node 3: Inserted copy (e.g., [-16, 1, -5]), child of node2
+        // Node 3: Inserted srcpos to destpos-1 (e.g., [-16, 1, -5]), child of node2
         struct sound_seg_node* node3 = malloc(sizeof(struct sound_seg_node));
         if (!node3) {
             if (node1) { free(node1->audio_data); free(node1); }
-            if (node2) { free(node2->audio_data); free(node2); }
+            free(node2->audio_data); free(node2);
             return;
         }
-        node3->audio_data = node2->audio_data; // Share data with node2
+        node3->audio_data = node2->audio_data; // Share with node2
         node3->length_of_the_segment = src_to_dest_len;
         node3->owns_data = false;
         node3->ref_count = 0;
         node3->parent_node = node2;
         node3->next = NULL;
 
-        // Node 4: Last element of inserted segment (e.g., [-15])
+        // Node 4: Inserted destpos to end (e.g., [-15]), child of node5
         struct sound_seg_node* node4 = malloc(sizeof(struct sound_seg_node));
         if (!node4) {
             if (node1) { free(node1->audio_data); free(node1); }
-            if (node2) { free(node2->audio_data); free(node2); }
+            free(node2->audio_data); free(node2);
             free(node3);
             return;
         }
-        node4->audio_data = malloc(1 * sizeof(int16_t));
+        node4->audio_data = malloc(dest_to_end_len * sizeof(int16_t));
         if (!node4->audio_data) {
             if (node1) { free(node1->audio_data); free(node1); }
-            if (node2) { free(node2->audio_data); free(node2); }
+            free(node2->audio_data); free(node2);
             free(node3);
             free(node4);
             return;
         }
-        memcpy(node4->audio_data, src_node->audio_data + src_offset + len - 1, 1 * sizeof(int16_t));
-        node4->length_of_the_segment = 1;
+        memcpy(node4->audio_data, src_node->audio_data + src_offset + src_to_dest_len, dest_to_end_len * sizeof(int16_t));
+        node4->length_of_the_segment = dest_to_end_len;
         node4->owns_data = true;
-        node4->ref_count = 1; // Will be parent of node5
-        node4->parent_node = NULL;
+        node4->ref_count = 0; // Will be set as child later
+        node4->parent_node = NULL; // Temporarily null
         node4->next = NULL;
 
-        // Node 5: Original last element (e.g., [-15]), child of node4
+        // Node 5: Original at destpos (e.g., [-15]), parent of node4
         struct sound_seg_node* node5 = malloc(sizeof(struct sound_seg_node));
         if (!node5) {
             if (node1) { free(node1->audio_data); free(node1); }
-            if (node2) { free(node2->audio_data); free(node2); }
+            free(node2->audio_data); free(node2);
             free(node3);
             free(node4->audio_data); free(node4);
             return;
         }
-        node5->audio_data = node4->audio_data; // Share data with node4
-        node5->length_of_the_segment = 1;
+        node5->audio_data = node4->audio_data; // Share with node4
+        node5->length_of_the_segment = dest_to_end_len;
         node5->owns_data = false;
         node5->ref_count = 0;
-        node5->parent_node = node4;
+        node5->parent_node = NULL;
         node5->next = NULL;
+
+        // Set node4 as parent of node5
+        node4->ref_count = 1;
+        node5->parent_node = node4;
 
         // Update linked list
         if (src_prev) {
@@ -697,33 +694,39 @@ void handle_self_insert_overlap(struct sound_seg* src, struct sound_seg* dest, s
             node1->next = node2;
             src->total_number_of_segments++;
         }
-        if (node2) {
-            node2->next = node3;
-            src->total_number_of_segments++;
-        }
+        node2->next = node3;
         node3->next = node4;
         node4->next = node5;
         node5->next = src_node->next;
-        src->total_number_of_segments += 3; // node3, node4, node5
+        src->total_number_of_segments += 4;
+
+        // Free original node
+        if (src_node->owns_data) free(src_node->audio_data);
+        free(src_node);
     }
-    // Case 2: destpos < srcpos
-    else {
-        // Node 1: Before destpos
+    // Case 2: destpos < srcpos < destpos + len
+    else if (destpos < srcpos && srcpos < destpos + len) {
+        size_t before_dest_len = destpos;              // Before destpos
+        size_t dest_to_src_len = srcpos - destpos;     // destpos to srcpos-1
+        size_t src_to_end_len = len - dest_to_src_len; // srcpos to end of inserted segment
+        size_t remaining_len = src_node->length_of_the_segment - src_offset - src_to_end_len;
+
+        // Node 1: Before destpos (e.g., [20])
         struct sound_seg_node* node1 = NULL;
-        if (destpos > 0) {
+        if (before_dest_len > 0) {
             node1 = malloc(sizeof(struct sound_seg_node));
             if (!node1) return;
-            node1->audio_data = malloc(destpos * sizeof(int16_t));
+            node1->audio_data = malloc(before_dest_len * sizeof(int16_t));
             if (!node1->audio_data) { free(node1); return; }
-            memcpy(node1->audio_data, src_node->audio_data, destpos * sizeof(int16_t));
-            node1->length_of_the_segment = destpos;
+            memcpy(node1->audio_data, src_node->audio_data, before_dest_len * sizeof(int16_t));
+            node1->length_of_the_segment = before_dest_len;
             node1->owns_data = true;
             node1->ref_count = 0;
             node1->parent_node = NULL;
             node1->next = NULL;
         }
 
-        // Node 2: Inserted segment (e.g., [-15] if len=1)
+        // Node 2: Inserted destpos to srcpos-1 + srcpos to end (e.g., [1, -5, -15]), parent
         struct sound_seg_node* node2 = malloc(sizeof(struct sound_seg_node));
         if (!node2) {
             if (node1) { free(node1->audio_data); free(node1); }
@@ -738,57 +741,54 @@ void handle_self_insert_overlap(struct sound_seg* src, struct sound_seg* dest, s
         memcpy(node2->audio_data, src_node->audio_data + src_offset, len * sizeof(int16_t));
         node2->length_of_the_segment = len;
         node2->owns_data = true;
-        node2->ref_count = 1; // Will be parent
+        node2->ref_count = 1; // Parent of node4
         node2->parent_node = NULL;
         node2->next = NULL;
 
-        // Node 3: Between destpos and srcpos
-        struct sound_seg_node* node3 = NULL;
-        if (src_to_dest_len > 0) {
-            node3 = malloc(sizeof(struct sound_seg_node));
-            if (!node3) {
-                if (node1) { free(node1->audio_data); free(node1); }
-                free(node2->audio_data); free(node2);
-                return;
-            }
-            node3->audio_data = malloc(src_to_dest_len * sizeof(int16_t));
-            if (!node3->audio_data) {
-                if (node1) { free(node1->audio_data); free(node1); }
-                free(node2->audio_data); free(node2);
-                free(node3);
-                return;
-            }
-            memcpy(node3->audio_data, src_node->audio_data + destpos, src_to_dest_len * sizeof(int16_t));
-            node3->length_of_the_segment = src_to_dest_len;
-            node3->owns_data = true;
-            node3->ref_count = 0;
-            node3->parent_node = NULL;
-            node3->next = NULL;
+        // Node 3: destpos to srcpos-1 (e.g., [-16])
+        struct sound_seg_node* node3 = malloc(sizeof(struct sound_seg_node));
+        if (!node3) {
+            if (node1) { free(node1->audio_data); free(node1); }
+            free(node2->audio_data); free(node2);
+            return;
         }
+        node3->audio_data = malloc(dest_to_src_len * sizeof(int16_t));
+        if (!node3->audio_data) {
+            if (node1) { free(node1->audio_data); free(node1); }
+            free(node2->audio_data); free(node2);
+            free(node3);
+            return;
+        }
+        memcpy(node3->audio_data, src_node->audio_data + destpos, dest_to_src_len * sizeof(int16_t));
+        node3->length_of_the_segment = dest_to_src_len;
+        node3->owns_data = true;
+        node3->ref_count = 0;
+        node3->parent_node = NULL;
+        node3->next = NULL;
 
-        // Node 4: Original segment from srcpos, child of node2
+        // Node 4: Original srcpos to end (e.g., [1, -5, -15]), child of node2
         struct sound_seg_node* node4 = malloc(sizeof(struct sound_seg_node));
         if (!node4) {
             if (node1) { free(node1->audio_data); free(node1); }
             free(node2->audio_data); free(node2);
-            if (node3) { free(node3->audio_data); free(node3); }
+            free(node3->audio_data); free(node3);
             return;
         }
-        node4->audio_data = node2->audio_data; // Share data with node2
+        node4->audio_data = node2->audio_data; // Share with node2
         node4->length_of_the_segment = len;
         node4->owns_data = false;
         node4->ref_count = 0;
         node4->parent_node = node2;
         node4->next = NULL;
 
-        // Node 5: Remaining after srcpos + len
+        // Node 5: Remaining after srcpos + len (e.g., [-5, -15])
         struct sound_seg_node* node5 = NULL;
         if (remaining_len > 0) {
             node5 = malloc(sizeof(struct sound_seg_node));
             if (!node5) {
                 if (node1) { free(node1->audio_data); free(node1); }
                 free(node2->audio_data); free(node2);
-                if (node3) { free(node3->audio_data); free(node3); }
+                free(node3->audio_data); free(node3);
                 free(node4);
                 return;
             }
@@ -796,12 +796,12 @@ void handle_self_insert_overlap(struct sound_seg* src, struct sound_seg* dest, s
             if (!node5->audio_data) {
                 if (node1) { free(node1->audio_data); free(node1); }
                 free(node2->audio_data); free(node2);
-                if (node3) { free(node3->audio_data); free(node3); }
+                free(node3->audio_data); free(node3);
                 free(node4);
                 free(node5);
                 return;
             }
-            memcpy(node5->audio_data, src_node->audio_data + src_offset + len, remaining_len * sizeof(int16_t));
+            memcpy(node5->audio_data, src_node->audio_data + src_offset + src_to_end_len, remaining_len * sizeof(int16_t));
             node5->length_of_the_segment = remaining_len;
             node5->owns_data = true;
             node5->ref_count = 0;
@@ -819,26 +819,19 @@ void handle_self_insert_overlap(struct sound_seg* src, struct sound_seg* dest, s
             node1->next = node2;
             src->total_number_of_segments++;
         }
-        node2->next = node3 ? node3 : node4;
-        src->total_number_of_segments++;
-        if (node3) {
-            node3->next = node4;
-            src->total_number_of_segments++;
-        }
+        node2->next = node3;
+        node3->next = node4;
         node4->next = node5;
-        src->total_number_of_segments++;
-        if (node5) {
-            node5->next = src_node->next;
-            src->total_number_of_segments++;
-        }
-    }
+        src->total_number_of_segments += (node5 ? 4 : 3);
 
-    // Free original node
-    if (src_node->owns_data) free(src_node->audio_data);
-    free(src_node);
+        // Free original node
+        if (src_node->owns_data) free(src_node->audio_data);
+        free(src_node);
+    }
 
     print_track_metadata(src, "after_overlap_insert");
 }
+
 void tr_insert(struct sound_seg* src, struct sound_seg* dest, size_t destpos, size_t srcpos, size_t len) {
     if (!src || !dest || len == 0) return;
     if (src == dest) {
