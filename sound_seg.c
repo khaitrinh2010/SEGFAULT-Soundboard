@@ -183,18 +183,35 @@ void tr_write(struct sound_seg* track, int16_t* src, size_t pos, size_t len) {
     if (written < len) {
         struct sound_seg_node* last = track->head;
         while (last->next) last = last->next;
-        size_t new_len = pos + len;
-        int16_t* new_data = realloc(last->audio_data, new_len * sizeof(int16_t));
-        if (!new_data) return;
-        for (size_t i = last->length_of_the_segment; i < new_len; i++) {
-            new_data[i] = 0;  // zero padding
+        size_t last_offset = 0;
+        struct sound_seg_node* walk = track->head;
+        while (walk && walk != last) {
+            last_offset += walk->length_of_the_segment;
+            walk = walk->next;
         }
-        last->audio_data = new_data;
-        last->length_of_the_segment = new_len;
+        size_t rel_pos = (pos > last_offset) ? pos - last_offset : 0;
+        size_t offset = 0;
+        if (pos > last_offset) {
+            offset = pos - last_offset;
+        }
+        size_t required_len = offset + len;
+        if (required_len > last->length_of_the_segment) {
+            int16_t* new_data = realloc(last->audio_data, required_len * sizeof(int16_t));
+            if (!new_data) return;
+
+            for (size_t i = last->length_of_the_segment; i < required_len; i++) {
+                new_data[i] = 0;
+            }
+
+            last->audio_data = new_data;
+            last->length_of_the_segment = required_len;
+        }
+
         for (; written < len; written++) {
-            last->audio_data[pos + written] = src[written];
+            last->audio_data[rel_pos + written] = src[written];
         }
     }
+
 }
 
 bool tr_delete_range(struct sound_seg* track, size_t pos, size_t len) {
@@ -618,10 +635,14 @@ void print_track_metadata(struct sound_seg* track, const char* track_name) {
 
 int main(int argc, char** argv) {
     struct sound_seg* s0 = tr_init();
-    tr_write(s0, ((int16_t[]){9}), 0, 1);
-    tr_insert(s0, s0, 0, 0, 1);
-    tr_write(s0, ((int16_t[]){-2,15}), 0, 2);
-    tr_write(s0, ((int16_t[]){-14,17,-7,20}), 1, 4);
-    size_t FAILING_LEN = tr_length(s0); //expected 5, actual 6
+    tr_write(s0, ((int16_t[]){-18,12}), 0, 2);
+    tr_insert(s0, s0, 0, 1, 1);
+
+    tr_write(s0, ((int16_t[]){1,7,-19}), 0, 3);
+
+    tr_write(s0, ((int16_t[]){17,-12,3,-19}), 2, 4);
+    print_track_metadata(s0, "Track");
+    size_t FAILING_LEN = tr_length(s0); //expected 6, actual 8
+    printf("Track length: %zu\n", FAILING_LEN);
     tr_destroy(s0);
 }
