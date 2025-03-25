@@ -40,6 +40,46 @@ struct wav_header {
      int32_t dlength;
  };
 
+void print_track_metadata(struct sound_seg* track, const char* track_name) {
+    printf("{\n");
+    printf("  \"track_name\": \"%s\",\n", track_name);
+    printf("  \"total_number_of_segments\": %zu,\n", track->total_number_of_segments);
+    printf("  \"segments\": [\n");
+
+    struct sound_seg_node* node = track->head;
+    int index = 0;
+    while (node) {
+        printf("    {\n");
+        printf("      \"segment_index\": %d,\n", index);
+        printf("      \"length_of_the_segment\": %zu,\n", node->length_of_the_segment);
+        printf("      \"owns_data\": %s,\n", node->owns_data ? "true" : "false");
+        printf("      \"ref_count\": %d,\n", node->ref_count);
+        printf("      \"audio_data\": [");
+        for (size_t i = 0; i < node->length_of_the_segment; i++) {
+            printf("%d", node->audio_data[i]);
+            if (i != node->length_of_the_segment - 1) printf(", ");
+        }
+        printf("],\n");
+        if (node->parent_node != NULL) {
+            printf("      \"parent\": {\n");
+            printf("        \"length_of_the_segment\": %zu,\n", node->parent_node->length_of_the_segment);
+            printf("        \"ref_count\": %d\n", node->parent_node->ref_count);
+            printf("      }\n");
+        } else {
+            printf("      \"parent\": null\n");
+        }
+
+        printf("    }");
+        node = node->next;
+        if (node) printf(",");
+        printf("\n");
+        index++;
+    }
+    printf("  ]\n");
+    printf("}\n");
+}
+
+
 // Load a WAV file into buffer
 void wav_load(const char* filename, int16_t* dest){  //wav file header is discarded
     FILE *file;
@@ -345,15 +385,28 @@ char* tr_identify(const struct sound_seg* target, const struct sound_seg* ad) {
 }
 
 void read_from_node(struct sound_seg_node* node) {
-    printf("Reading from node...\n");
-    printf("Length of audio data: %zu\n", node->length_of_the_segment);
-    int16_t* audio_data = node->audio_data;
-    size_t len = node->length_of_the_segment;
-    for (size_t i = 0; i < len; i++) {
-        printf("%d ", audio_data[i]);
+    printf("  Address: %p\n", &node);
+    printf("  Length: %zu\n", node->length_of_the_segment);
+    printf("  Owns Data: %s\n", node->owns_data ? "true" : "false");
+    printf("  Ref Count: %d\n", node->ref_count);
+    printf("  Audio Data: [");
+    for (size_t i = 0; i < node->length_of_the_segment; ++i) {
+        printf("%d", node->audio_data[i]);
+        if (i + 1 != node->length_of_the_segment) {
+            printf(", ");
+        }
     }
-    printf("\n");
+    printf("]\n");
+    if (node->parent_node) {
+        printf("  Parent: [Length: %zu, Ref Count: %d, Address: %p]\n",
+               node->parent_node->length_of_the_segment,
+               node->parent_node->ref_count,
+               &node->parent_node);
+    } else {
+        printf("  Parent: NULL\n");
+    }
 }
+
 void handle_self_insert(struct sound_seg* src, struct sound_seg* dest, size_t destpos, size_t srcpos, size_t len) {
     struct sound_seg_node* src_node = src->head;
     struct sound_seg_node* src_prev = NULL;
@@ -437,7 +490,7 @@ void handle_self_insert(struct sound_seg* src, struct sound_seg* dest, size_t de
         if (src_after) { free(src_after->audio_data); free(src_after); }
         return;
     }
-    new_node->audio_data = middle->audio_data;
+    new_node->audio_data = (int16_t*) malloc(len * sizeof(int16_t));
     if (!new_node->audio_data) {
         if (src_before) { free(src_before->audio_data); free(src_before); }
         if (middle) { free(middle->audio_data); free(middle); }
@@ -451,6 +504,7 @@ void handle_self_insert(struct sound_seg* src, struct sound_seg* dest, size_t de
     new_node->ref_count = 0;
     new_node->parent_node = middle;
     new_node->next = NULL;
+
 
     if (src_prev) {
         src_prev->next = src_before ? src_before : middle;
@@ -469,9 +523,8 @@ void handle_self_insert(struct sound_seg* src, struct sound_seg* dest, size_t de
     }
 
     //FREE
-    free(src_node->audio_data);
+    if (src_node->owns_data && src_node->ref_count == 0) free(src_node->audio_data);
     free(src_node);
-
     struct sound_seg_node* current = dest->head;
     struct sound_seg_node* prev = NULL;
     skipped = 0;
@@ -537,6 +590,11 @@ void handle_self_insert(struct sound_seg* src, struct sound_seg* dest, size_t de
         dest_after->next = NULL;
     }
 
+    // read_from_node(prev);
+    // read_from_node(dest_before);
+    // read_from_node(new_node);
+    // read_from_node(dest_after);
+
     if (prev) prev->next = dest_before ? dest_before : new_node;
     else dest->head = dest_before ? dest_before : new_node;
     if (dest_before) {
@@ -551,8 +609,11 @@ void handle_self_insert(struct sound_seg* src, struct sound_seg* dest, size_t de
     }
 
     //FREE
-    free(current->audio_data);
-    free(current);
+    if (current->owns_data && current->ref_count == 0) {
+        free(current->audio_data);
+    }
+    //free(current);
+    print_track_metadata(dest, "dest");
 }
 
 void tr_insert(struct sound_seg* src, struct sound_seg* dest, size_t destpos, size_t srcpos, size_t len) {
@@ -699,55 +760,12 @@ void tr_insert(struct sound_seg* src, struct sound_seg* dest, size_t destpos, si
     free(dest_node);
 }
 
-void print_track_metadata(struct sound_seg* track, const char* track_name) {
-    printf("{\n");
-    printf("  \"track_name\": \"%s\",\n", track_name);
-    printf("  \"total_number_of_segments\": %zu,\n", track->total_number_of_segments);
-    printf("  \"segments\": [\n");
-
-    struct sound_seg_node* node = track->head;
-    int index = 0;
-    while (node) {
-        printf("    {\n");
-        printf("      \"segment_index\": %d,\n", index);
-        printf("      \"length_of_the_segment\": %zu,\n", node->length_of_the_segment);
-        printf("      \"owns_data\": %s,\n", node->owns_data ? "true" : "false");
-        printf("      \"ref_count\": %d,\n", node->ref_count);
-        printf("      \"audio_data\": [");
-        for (size_t i = 0; i < node->length_of_the_segment; i++) {
-            printf("%d", node->audio_data[i]);
-            if (i != node->length_of_the_segment - 1) printf(", ");
-        }
-        printf("],\n");
-        if (node->parent_node != NULL) {
-            printf("      \"parent\": {\n");
-            printf("        \"length_of_the_segment\": %zu,\n", node->parent_node->length_of_the_segment);
-            printf("        \"ref_count\": %d\n", node->parent_node->ref_count);
-            printf("      }\n");
-        } else {
-            printf("      \"parent\": null\n");
-        }
-
-        printf("    }");
-        node = node->next;
-        if (node) printf(",");
-        printf("\n");
-        index++;
-    }
-    printf("  ]\n");
-    printf("}\n");
-}
 
 int main(int argc, char** argv) {
     struct sound_seg* s0 = tr_init();
-    tr_write(s0, ((int16_t[]){-6}), 0, 1);
-    tr_insert(s0, s0, 1, 0, 1);
-
-    tr_write(s0, ((int16_t[]){-17,19}), 0, 2);
-
-    print_track_metadata(s0, "track");
-    int16_t FAILING_READ[2];
-    tr_read(s0, FAILING_READ, 0, 2);
-    //expected [19 19], actual [-17  19]!
-    tr_destroy(s0);
+    tr_write(s0, ((int16_t[]){20,-16,1,-5,-15}), 0, 5);
+    tr_insert(s0, s0, 4, 1, 4);
+    //print_track_metadata(s0, "track");
+    tr_write(s0, ((int16_t[]){3,-16,-16,6,15,11,2,-9,0}), 0, 9);
+    //print_track_metadata(s0, "track");
 }
