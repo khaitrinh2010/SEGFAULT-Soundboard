@@ -1003,5 +1003,4 @@ void tr_insert(struct sound_seg* src, struct sound_seg* dest, size_t destpos, si
 
 
 int main(int argc, char** argv) {
-
 }
