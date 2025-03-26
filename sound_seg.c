@@ -232,7 +232,7 @@ void tr_write(struct sound_seg* track, int16_t* src, size_t pos, size_t len) {
         }
         size_t rel_pos = (pos > last_offset) ? pos - last_offset : 0;
         size_t offset = pos - last_offset;
-        size_t required_len = rel_pos + (len - written);
+        size_t required_len = offset + len;
         if (required_len > last->length_of_the_segment) {
             int16_t* new_data = realloc(last->audio_data, required_len * sizeof(int16_t));
             if (!new_data) return;
