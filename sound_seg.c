@@ -194,12 +194,11 @@ bool tr_delete_range(struct sound_seg* track, size_t pos, size_t len) {
     struct sound_seg_node* check = current;
     for (size_t j = 0; j < len && check; j++) {
         if (check->ref_count > 1) {
-            return false; //can’t delete if it has children
+            return false;
         }
         check = check->next;
     }
 
-    //current stop in the position I want to delete
     for (size_t j = 0; j < len && current; j++) {
         struct sound_seg_node* next = current->next;
         if (current->parent_node != NULL) {
@@ -312,7 +311,10 @@ void tr_insert(struct sound_seg* src_track, struct sound_seg* dest_track,
         new_node->ref_count = 0;
         new_node->next = NULL;
         new_node->parent_node = src_temp;
-        if (!src_temp->parent_node) {
+        if (src_temp->ref_count == 0) {
+            src_temp->ref_count = 1;
+        }
+        else {
             src_temp->ref_count++;
         }
         if (!insert_head) insert_head = insert_tail = new_node;
@@ -336,19 +338,5 @@ void tr_insert(struct sound_seg* src_track, struct sound_seg* dest_track,
 }
 
 int main(int argc, char** argv) {
-    struct sound_seg* s0 = tr_init();
-    tr_write(s0, ((int16_t[]){-7,-4,-20,-4,-8}), 0, 5);
-    struct sound_seg* s1 = tr_init();
-    tr_write(s1, ((int16_t[]){3}), 0, 1);
-    tr_write(s1, ((int16_t[]){-9,20,-18}), 1, 3);
-    tr_insert(s1, s1, 1, 1, 3);
-    tr_write(s1, ((int16_t[]){-20,-4,-19,0,8,-17,17}), 0, 7);
-    tr_write(s0, ((int16_t[]){-6,-8,4,-1,-2}), 0, 5);
-    int16_t FAILING_READ[7];
-    tr_read(s1, FAILING_READ, 0, 7);
-    for (size_t i = 0; i < 7; i++) {
-        printf("FAILING_READ[%d] = %d\n", i, FAILING_READ[i]);
-    }
-    tr_destroy(s0);
-    tr_destroy(s1);
+
 }
