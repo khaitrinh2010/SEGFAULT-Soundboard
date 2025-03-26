@@ -864,6 +864,7 @@ void handle_self_insert_overlap(struct sound_seg* src, struct sound_seg* dest, s
 }
 
 void tr_insert(struct sound_seg* src, struct sound_seg* dest, size_t destpos, size_t srcpos, size_t len) {
+    if (srcpos >= tr_length(src) || destpos > tr_length(dest)) return;
     if (!src || !dest || len == 0) return;
     if (src == dest) {
         if (srcpos + len <=destpos || destpos + len <= srcpos || destpos == srcpos) { //no overlap
@@ -1011,20 +1012,19 @@ void tr_insert(struct sound_seg* src, struct sound_seg* dest, size_t destpos, si
 
 int main(int argc, char** argv) {
     struct sound_seg* s0 = tr_init();
-    tr_write(s0, ((int16_t[]){-7,-4,-20,-4,-8}), 0, 5);
+    tr_write(s0, ((int16_t[]){9,-20,1,-9,7,-18,1,20}), 0, 8);
     struct sound_seg* s1 = tr_init();
-    tr_write(s1, ((int16_t[]){3}), 0, 1);
-    tr_write(s1, ((int16_t[]){-9,20,-18}), 1, 3);
-    tr_insert(s1, s1, 1, 1, 3);
+    tr_write(s1, ((int16_t[]){-8,15}), 0, 2);
+    tr_write(s0, ((int16_t[]){16,-8}), 0, 2);
+    tr_insert(s1, s0, 3, 0, 1);
     print_track_metadata(s1, "s1");
-    tr_write(s1, ((int16_t[]){-20,-4,-19,0,8,-17,17}), 0, 7);
-    tr_write(s0, ((int16_t[]){-6,-8,4,-1,-2}), 0, 5);
-    int16_t FAILING_READ[7];
-    tr_read(s1, FAILING_READ, 0, 7);
-    //expected [-20   8 -17  17   8 -17  17], actual [-20  -4 -19   0   8 -17  17]!
-    for (size_t i = 0; i < 7; i++) {
-        printf("FAILING_READ[%d] = %d\n", i, FAILING_READ[i]);
-    }
-    tr_destroy(s0);
-    tr_destroy(s1);
+
+    tr_write(s0, ((int16_t[]){-6,5,5,-5,4,7,18,0,-13}), 0, 9);
+    tr_write(s1, ((int16_t[]){-4,6}), 0, 2);
+    tr_write(s0, ((int16_t[]){-14,-20,-2}), 7, 3);
+    tr_write(s0, ((int16_t[]){-2,-12,18,-3,-11,-6,10,-4,-15,-11}), 0, 10);
+    tr_delete_range(s0, 8, 1); //expect return True
+    tr_write(s0, ((int16_t[]){-9,-5,-4}), 5, 3);
+    tr_delete_range(s0, 5, 3); //expect return True
+    tr_write(s1, ((int16_t[]){-17,-7,20,-2}), 0, 4);
 }
