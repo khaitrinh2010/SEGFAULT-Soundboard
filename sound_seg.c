@@ -12,7 +12,7 @@
 //SIGNAL 11: occurs when program attempts to access memory it does not have permission to access
 struct sound_seg_node {
     int16_t* sample;
-    int ref_count;
+    short ref_count;
     struct sound_seg_node* next;
     struct sound_seg_node* parent_node;
     bool owns_data;
@@ -372,13 +372,13 @@ void print_track(struct sound_seg* track) {
 }
 
 int main(int argc, char** argv) {
-    struct sound_seg* s0 = tr_init();
-    tr_write(s0, ((int16_t[]){-8,-6,-13,17,13,-19,11,-1}), 0, 8);
-    tr_write(s0, ((int16_t[]){8,-15,12,-14,-17,15,-15,-10}), 0, 8);
-    tr_delete_range(s0, 3, 4); //expect return True
-    tr_insert(s0, s0, 3, 3, 1);
-
-    tr_write(s0, ((int16_t[]){1,1,9,20,18}), 0, 5);
-    print_track(s0);
-    tr_delete_range(s0, 1, 3); //expect return True
+    // struct sound_seg* s0 = tr_init();
+    // tr_write(s0, ((int16_t[]){-8,-6,-13,17,13,-19,11,-1}), 0, 8);
+    // tr_write(s0, ((int16_t[]){8,-15,12,-14,-17,15,-15,-10}), 0, 8);
+    // tr_delete_range(s0, 3, 4); //expect return True
+    // tr_insert(s0, s0, 3, 3, 1);
+    //
+    // tr_write(s0, ((int16_t[]){1,1,9,20,18}), 0, 5);
+    // print_track(s0);
+    //tr_delete_range(s0, 1, 3); //expect return True
 }
