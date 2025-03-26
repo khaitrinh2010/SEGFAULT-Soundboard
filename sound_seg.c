@@ -18,8 +18,8 @@ struct sound_seg_node {
 };
 
 struct sound_seg {
-    struct sound_seg_node* head;  // Head of the sample list
-    size_t total_samples;         // Total number of samples in the track
+    struct sound_seg_node* head;
+    size_t total_samples;
 };
 
 struct wav_header {
@@ -226,7 +226,7 @@ double compute_cross_correlation(const int16_t* target, const int16_t* ad, size_
     return sum_product / sum_ad_sq; // Normalize by ad's autocorrelation
 }
 
-char* tr_identify(struct sound_seg* target, const struct sound_seg* ad) {
+char* tr_identify(struct sound_seg* target, struct sound_seg* ad) {
     if (!target || !ad || tr_length(ad) > tr_length(target)) return strdup("");
     size_t target_len = tr_length(target);
     size_t ad_len = tr_length(ad);
