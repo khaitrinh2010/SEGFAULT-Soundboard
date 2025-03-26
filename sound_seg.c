@@ -87,7 +87,6 @@ void wav_save(const char* fname, int16_t* src, size_t len){
     fseek(file, OFFSET_TO_AUDIO_DATA, SEEK_SET);
     fwrite(src, sizeof(int16_t), len, file);
     fclose(file);
-    return;
 }
 
 struct sound_seg* tr_init(void) {
@@ -129,7 +128,7 @@ void tr_read(struct sound_seg* track, int16_t* dest, size_t pos, size_t len) {
         i++;
     }
     for (size_t j = 0; j < len && current; j++) {
-        dest[j] = *(current->sample); // Dereference shared sample
+        dest[j] = *(current->sample);
         current = current->next;
     }
 }
@@ -217,7 +216,7 @@ bool tr_delete_range(struct sound_seg* track, size_t pos, size_t len) {
     return true;
 }
 
-static double compute_cross_correlation(const int16_t* target, const int16_t* ad, size_t len) {
+double compute_cross_correlation(const int16_t* target, const int16_t* ad, size_t len) {
     double sum_product = 0.0;
     double sum_ad_sq = 0.0;
     for (size_t i = 0; i < len; i++) {
@@ -227,7 +226,7 @@ static double compute_cross_correlation(const int16_t* target, const int16_t* ad
     return sum_product / sum_ad_sq; // Normalize by ad's autocorrelation
 }
 
-char* tr_identify(const struct sound_seg* target, const struct sound_seg* ad) {
+char* tr_identify(struct sound_seg* target, const struct sound_seg* ad) {
     if (!target || !ad || tr_length(ad) > tr_length(target)) return strdup("");
     size_t target_len = tr_length(target);
     size_t ad_len = tr_length(ad);
