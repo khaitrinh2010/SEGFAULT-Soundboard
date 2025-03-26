@@ -54,6 +54,7 @@ void print_track_metadata(struct sound_seg* track, const char* track_name) {
         printf("      \"length_of_the_segment\": %zu,\n", node->length_of_the_segment);
         printf("      \"owns_data\": %s,\n", node->owns_data ? "true" : "false");
         printf("      \"ref_count\": %d,\n", node->ref_count);
+        printf("      \"address of audio data\": %p,\n", node->audio_data);
         printf("      \"audio_data\": [");
         for (size_t i = 0; i < node->length_of_the_segment; i++) {
             printf("%d", node->audio_data[i]);
@@ -231,7 +232,7 @@ void tr_write(struct sound_seg* track, int16_t* src, size_t pos, size_t len) {
         }
         size_t rel_pos = (pos > last_offset) ? pos - last_offset : 0;
         size_t offset = pos - last_offset;
-        size_t required_len = offset + len;
+        size_t required_len = rel_pos + (len - written);
         if (required_len > last->length_of_the_segment) {
             int16_t* new_data = realloc(last->audio_data, required_len * sizeof(int16_t));
             if (!new_data) return;
@@ -446,7 +447,7 @@ void handle_self_insert(struct sound_seg* src, struct sound_seg* dest, size_t de
         if (src_after) { free(src_after->audio_data); free(src_after); }
         return;
     }
-    new_node->audio_data = (int16_t*) malloc(len * sizeof(int16_t));
+    new_node->audio_data = middle->audio_data;
     if (!new_node->audio_data) {
         if (src_before) { free(src_before->audio_data); free(src_before); }
         if (middle) { free(middle->audio_data); free(middle); }
@@ -454,13 +455,11 @@ void handle_self_insert(struct sound_seg* src, struct sound_seg* dest, size_t de
         free(new_node);
         return;
     }
-    memcpy(new_node->audio_data, middle->audio_data, len * sizeof(int16_t));
     new_node->length_of_the_segment = len;
     new_node->owns_data = false;
     new_node->ref_count = 0;
     new_node->parent_node = middle;
     new_node->next = NULL;
-
 
     if (src_prev) {
         src_prev->next = src_before ? src_before : middle;
@@ -565,6 +564,7 @@ void handle_self_insert(struct sound_seg* src, struct sound_seg* dest, size_t de
     }
 
     //FREE
+    read_from_node(current);
     if (current->owns_data && current->ref_count == 0) {
         free(current->audio_data);
     }
@@ -859,7 +859,7 @@ void handle_self_insert_overlap(struct sound_seg* src, struct sound_seg* dest, s
 void tr_insert(struct sound_seg* src, struct sound_seg* dest, size_t destpos, size_t srcpos, size_t len) {
     if (!src || !dest || len == 0) return;
     if (src == dest) {
-        if (srcpos + len <=destpos || destpos + len <= srcpos) { //no overlap
+        if (srcpos + len <=destpos || destpos + len <= srcpos || destpos == srcpos) { //no overlap
             handle_self_insert(src, dest, destpos, srcpos, len);
         }
         else {
@@ -1004,9 +1004,20 @@ void tr_insert(struct sound_seg* src, struct sound_seg* dest, size_t destpos, si
 
 int main(int argc, char** argv) {
     struct sound_seg* s0 = tr_init();
-    tr_write(s0, ((int16_t[]){20,-16,1,-5,-15}), 0, 5);
-    tr_insert(s0, s0, 4, 1, 4);
-    tr_write(s0, ((int16_t[]){3,-16,-16,6,15,11,2,-9,0}), 0, 9);
+    tr_write(s0, ((int16_t[]){-7,-4,-20,-4,-8}), 0, 5);
+    struct sound_seg* s1 = tr_init();
+    tr_write(s1, ((int16_t[]){3}), 0, 1);
+    tr_write(s1, ((int16_t[]){-9,20,-18}), 1, 3);
+    tr_insert(s1, s1, 1, 1, 3);
+    print_track_metadata(s1, "s1");
+    tr_write(s1, ((int16_t[]){-20,-4,-19,0,8,-17,17}), 0, 7);
+    tr_write(s0, ((int16_t[]){-6,-8,4,-1,-2}), 0, 5);
+    int16_t FAILING_READ[7];
+    tr_read(s1, FAILING_READ, 0, 7);
+    //expected [-20   8 -17  17   8 -17  17], actual [-20  -4 -19   0   8 -17  17]!
+    for (size_t i = 0; i < 7; i++) {
+        printf("FAILING_READ[%d] = %d\n", i, FAILING_READ[i]);
+    }
     tr_destroy(s0);
-    print_track_metadata(s0, "s0");
+    tr_destroy(s1);
 }
