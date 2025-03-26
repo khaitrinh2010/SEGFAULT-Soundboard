@@ -145,6 +145,7 @@ void tr_write(struct sound_seg* track, const int16_t* src, size_t pos, size_t le
         struct sound_seg_node* new_node = malloc(sizeof(struct sound_seg_node));
         if (!new_node) return;
         new_node->sample = malloc(sizeof(int16_t));
+
         if (!new_node->sample) { free(new_node); return; }
         *new_node->sample = 0;
         new_node->ref_count = 0;
@@ -217,43 +218,53 @@ bool tr_delete_range(struct sound_seg* track, size_t pos, size_t len) {
     return true;
 }
 
-double compute_cross_correlation(const int16_t* target, const int16_t* ad, size_t len) {
+// Compute cross-correlation directly from sound_seg nodes
+double compute_cross_correlation_nodes(struct sound_seg* target, size_t target_pos,
+                                      struct sound_seg* ad, size_t ad_pos, size_t len) {
+    if (!target || !ad) return 0.0;
+
+    struct sound_seg_node* t_node = target->head;
+    size_t t_idx = 0;
+    while (t_node && t_idx < target_pos) {
+        t_node = t_node->next;
+        t_idx++;
+    }
+    if (!t_node) return 0.0; // Out of bounds
+
+    struct sound_seg_node* a_node = ad->head;
+    size_t a_idx = 0;
+    while (a_node && a_idx < ad_pos) {
+        a_node = a_node->next;
+        a_idx++;
+    }
+    if (!a_node) return 0.0; // Out of bounds
+
     double sum_product = 0.0;
     double sum_ad_sq = 0.0;
-    for (size_t i = 0; i < len; i++) {
-        sum_product += (double)target[i] * (double)ad[i];
-        sum_ad_sq += (double)ad[i] * (double)ad[i];
+    for (size_t i = 0; i < len && t_node && a_node; i++) {
+        sum_product += (double)(*t_node->sample) * (double)(*a_node->sample);
+        sum_ad_sq += (double)(*a_node->sample) * (double)(*a_node->sample);
+        t_node = t_node->next;
+        a_node = a_node->next;
     }
-    return sum_product / sum_ad_sq; // Normalize by ad's autocorrelation
+
+    return sum_ad_sq > 0 ? sum_product / sum_ad_sq : 0.0; // Avoid division by zero
 }
 
 char* tr_identify(struct sound_seg* target, struct sound_seg* ad) {
     if (!target || !ad || tr_length(ad) > tr_length(target)) return strdup("");
+
     size_t target_len = tr_length(target);
     size_t ad_len = tr_length(ad);
-    int16_t* target_data = malloc(target_len * sizeof(int16_t));
-    int16_t* ad_data = malloc(ad_len * sizeof(int16_t));
-    if (!target_data || !ad_data) {
-        free(target_data);
-        free(ad_data);
-        return strdup("");
-    }
-    tr_read((struct sound_seg*)target, target_data, 0, target_len);
-    tr_read((struct sound_seg*)ad, ad_data, 0, ad_len);
 
     char* result = malloc(256);
-    if (!result) {
-        free(target_data);
-        free(ad_data);
-        return strdup("");
-    }
+    if (!result) return strdup("");
     size_t capacity = 256;
     size_t used = 0;
     result[0] = '\0';
-
     for (size_t i = 0; i <= target_len - ad_len; i++) {
-        double corr = compute_cross_correlation(target_data + i, ad_data, ad_len);
-        if (corr >= 0.95) {
+        double corr = compute_cross_correlation_nodes(target, i, ad, 0, ad_len);
+        if (corr >= 0.95) { // Match found
             char temp[32];
             snprintf(temp, sizeof(temp), "%zu,%zu\n", i, i + ad_len - 1);
             size_t len = strlen(temp);
@@ -262,20 +273,16 @@ char* tr_identify(struct sound_seg* target, struct sound_seg* ad) {
                 char* new_result = realloc(result, capacity);
                 if (!new_result) {
                     free(result);
-                    free(target_data);
-                    free(ad_data);
                     return strdup("");
                 }
                 result = new_result;
             }
             strcpy(result + used, temp);
             used += len;
-            i += ad_len - 1;
+            i += ad_len - 1; // Skip ahead to avoid overlapping matches
         }
     }
 
-    free(target_data);
-    free(ad_data);
     if (used == 0) {
         free(result);
         return strdup("");
@@ -283,7 +290,6 @@ char* tr_identify(struct sound_seg* target, struct sound_seg* ad) {
     if (used > 0 && result[used - 1] == '\n') result[used - 1] = '\0';
     return result;
 }
-
 void tr_insert(struct sound_seg* src_track, struct sound_seg* dest_track,
                size_t destpos, size_t srcpos, size_t len) {
     if (!src_track || !dest_track || len == 0 || srcpos + len > tr_length(src_track)) return;
@@ -372,13 +378,4 @@ void print_track(struct sound_seg* track) {
 }
 
 int main(int argc, char** argv) {
-    // struct sound_seg* s0 = tr_init();
-    // tr_write(s0, ((int16_t[]){-8,-6,-13,17,13,-19,11,-1}), 0, 8);
-    // tr_write(s0, ((int16_t[]){8,-15,12,-14,-17,15,-15,-10}), 0, 8);
-    // tr_delete_range(s0, 3, 4); //expect return True
-    // tr_insert(s0, s0, 3, 3, 1);
-    //
-    // tr_write(s0, ((int16_t[]){1,1,9,20,18}), 0, 5);
-    // print_track(s0);
-    //tr_delete_range(s0, 1, 3); //expect return True
 }
