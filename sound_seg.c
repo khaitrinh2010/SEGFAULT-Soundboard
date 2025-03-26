@@ -103,11 +103,8 @@ void tr_destroy(struct sound_seg* track) {
     struct sound_seg_node* current = track->head;
     while (current) {
         struct sound_seg_node* next = current->next;
-        if (!current->parent_node) { // This node owns the sample
-            current->ref_count--;
-            if (current->ref_count == 0) {
-                free(current->sample);
-            }
+        if (current->owns_data) { // This node owns the sample
+            free(current->sample);
         }
         free(current);
         current = next;
