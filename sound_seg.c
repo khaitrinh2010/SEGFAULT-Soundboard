@@ -20,6 +20,7 @@ struct sound_seg_node {
 };
 
 struct sound_seg {
+
     struct sound_seg_node* head;
     size_t total_number_of_segments;
 };
