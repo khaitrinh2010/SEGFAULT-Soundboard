@@ -65,38 +65,45 @@ void wav_save(const char* fname, int16_t* src, size_t len) {
         return;
     }
 
-    // WAV parameters (fixed: PCM, 16-bit, mono, 8000Hz)
-    const int16_t format_tag = 1;         // PCM
-    const int16_t num_chans = 1;          // Mono
-    const int32_t sample_rate = 8000;     // 8000 Hz
-    const int16_t bits_per_sample = 16;   // 16-bit
-    const int16_t bytes_per_sample = bits_per_sample / 8;
-    const int32_t bytes_per_sec = bytes_per_sample * sample_rate;
-    const int32_t chunk_size = 16;        // Size of fmt sub-chunk
-    const int32_t dlength = len * sizeof(int16_t); // Data length in bytes
-    const int32_t flength = dlength + OFFSET_TO_AUDIO_DATA; // Total file length - 8
+    // Define a union for the WAV header
+    union wav_header {
+        struct {
+            // RIFF chunk
+            char riff[4];
+            uint32_t flength;
+            char wave[4];
+            // fmt sub-chunk
+            char fmt[4];
+            int32_t chunk_size;
+            int16_t format_tag;
+            int16_t num_chans;
+            int32_t sample_rate;
+            int32_t bytes_per_sec;
+            int16_t bytes_per_sample;
+            int16_t bits_per_sample;
+            // data sub-chunk
+            char data[4];
+            int32_t dlength;
+        } fields;
+        char bytes[OFFSET_TO_AUDIO_DATA];
+    } header;
 
-    // Write RIFF header
-    fwrite("RIFF", sizeof(char), 4, file);
-    fwrite(&flength, sizeof(uint32_t), 1, file);
-    fwrite("WAVE", sizeof(char), 4, file);
+    memcpy(header.fields.riff, "RIFF", 4);
+    header.fields.flength = len * sizeof(int16_t) + OFFSET_TO_AUDIO_DATA;
+    memcpy(header.fields.wave, "WAVE", 4);
+    memcpy(header.fields.fmt, "fmt ", 4);
+    header.fields.chunk_size = 16;
+    header.fields.format_tag = 1;         // PCM
+    header.fields.num_chans = 1;          // Mono
+    header.fields.sample_rate = 8000;     // 8000 Hz
+    header.fields.bytes_per_sec = 8000 * 2;
+    header.fields.bytes_per_sample = 2;
+    header.fields.bits_per_sample = 16;
+    memcpy(header.fields.data, "data", 4);
+    header.fields.dlength = len * sizeof(int16_t);
 
-    // Write fmt sub-chunk
-    fwrite("fmt ", sizeof(char), 4, file);
-    fwrite(&chunk_size, sizeof(int32_t), 1, file);
-    fwrite(&format_tag, sizeof(int16_t), 1, file);
-    fwrite(&num_chans, sizeof(int16_t), 1, file);
-    fwrite(&sample_rate, sizeof(int32_t), 1, file);
-    fwrite(&bytes_per_sec, sizeof(int32_t), 1, file);
-    fwrite(&bytes_per_sample, sizeof(int16_t), 1, file);
-    fwrite(&bits_per_sample, sizeof(int16_t), 1, file);
+    fwrite(&header, sizeof(header), 1, file);
 
-    // Write data sub-chunk
-    fwrite("data", sizeof(char), 4, file);
-    fwrite(&dlength, sizeof(int32_t), 1, file);
-
-    // Write audio data
-    fseek(file, OFFSET_TO_AUDIO_DATA, SEEK_SET);
     fwrite(src, sizeof(int16_t), len, file);
 
     fclose(file);
