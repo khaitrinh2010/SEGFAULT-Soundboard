@@ -220,39 +220,39 @@ char* tr_identify(struct sound_seg* target, struct sound_seg* ad) {
     return result;
 }
 
-// wav_load and wav_save adjusted for array of nodes
-void wav_load(const char* filename, struct sound_seg* track) {
-    FILE* file = fopen(filename, "rb");
-    if (!file) {
-        printf("Error opening file\n");
-        return;
+void wav_load(const char* filename, int16_t* dest){  //wav file header is discarded
+    FILE *file;
+    file = fopen(filename, "rb");
+    if (file == NULL){
+      printf("Error opening file\n");
+      return;
     }
-    fseek(file, OFFSET, SEEK_SET);
+    //WAV File: RIFF header, FMT sub-chunk, DATA sub-chunk
+    fseek(file, OFFSET, SEEK_SET); // Extract how many bytes in the data audio
     uint32_t number_of_bytes;
-    fread(&number_of_bytes, sizeof(uint32_t), 1, file);
-    size_t sample_count = number_of_bytes / sizeof(int16_t);
-    tr_resize(track, sample_count);
+    fread(&number_of_bytes, sizeof(uint32_t), 1, file); //read how many number_of_bytes excluding the sample I should read
+
     fseek(file, OFFSET_TO_AUDIO_DATA, SEEK_SET);
-    for (size_t i = 0; i < sample_count; i++) {
-        fread(&track->nodes[i].A.parent_data.sample, sizeof(int16_t), 1, file);
-        track->nodes[i].A.parent_data.refCount = 0;
-        track->nodes[i].isParent = true;
-    }
-    track->length = sample_count;
+    fread(dest, sizeof(int16_t), number_of_bytes / sizeof(int16_t), file); //Read the data and write to the stream
     fclose(file);
+    return;
 }
 
-void wav_save(const char* fname, struct sound_seg* track) {
-    FILE* file = fopen(fname, "wb");
-    if (!file) {
+void wav_save(const char* fname, int16_t* src, size_t len) {
+    FILE *file = fopen(fname, "wb");
+    if (file == NULL) {
         printf("Error opening file\n");
         return;
     }
+
+    // Define a union for the WAV header
     union wav_header {
         struct {
+            // RIFF chunk
             char riff[4];
             uint32_t flength;
             char wave[4];
+            // fmt sub-chunk
             char fmt[4];
             int32_t chunk_size;
             int16_t format_tag;
@@ -261,34 +261,31 @@ void wav_save(const char* fname, struct sound_seg* track) {
             int32_t bytes_per_sec;
             int16_t bytes_per_sample;
             int16_t bits_per_sample;
+            // data sub-chunk
             char data[4];
             int32_t dlength;
         } fields;
         char bytes[OFFSET_TO_AUDIO_DATA];
-    } header = {
-        .fields = {
-            .riff = "RIFF",
-            .flength = track->length * sizeof(int16_t) + OFFSET_TO_AUDIO_DATA,
-            .wave = "WAVE",
-            .fmt = "fmt ",
-            .chunk_size = 16,
-            .format_tag = 1,
-            .num_chans = 1,
-            .sample_rate = 8000,
-            .bytes_per_sec = 8000 * 2,
-            .bytes_per_sample = 2,
-            .bits_per_sample = 16,
-            .data = "data",
-            .dlength = track->length * sizeof(int16_t)
-        }
-    };
+    } header;
+
+    memcpy(header.fields.riff, "RIFF", 4);
+    header.fields.flength = len * sizeof(int16_t) + OFFSET_TO_AUDIO_DATA;
+    memcpy(header.fields.wave, "WAVE", 4);
+    memcpy(header.fields.fmt, "fmt ", 4);
+    header.fields.chunk_size = 16;
+    header.fields.format_tag = 1;         // PCM
+    header.fields.num_chans = 1;          // Mono
+    header.fields.sample_rate = 8000;     // 8000 Hz
+    header.fields.bytes_per_sec = 8000 * 2;
+    header.fields.bytes_per_sample = 2;
+    header.fields.bits_per_sample = 16;
+    memcpy(header.fields.data, "data", 4);
+    header.fields.dlength = len * sizeof(int16_t);
+
     fwrite(&header, sizeof(header), 1, file);
-    int16_t* buffer = malloc(track->length * sizeof(int16_t));
-    if (buffer) {
-        tr_read(track, buffer, 0, track->length);
-        fwrite(buffer, sizeof(int16_t), track->length, file);
-        free(buffer);
-    }
+
+    fwrite(src, sizeof(int16_t), len, file);
+
     fclose(file);
 }
 
