@@ -11,11 +11,17 @@
 
 //SIGNAL 11: occurs when program attempts to access memory it does not have permission to access
 struct sound_seg_node {
-    int16_t* sample;
-    short ref_count;
+    union A {
+        struct  {;
+            int refCount;
+            int16_t sample;
+        } parent_data;
+        struct {
+            int16_t* parent_data_address;
+        }  child_data        ;
+    } A;
     struct sound_seg_node* next;
-    struct sound_seg_node* parent_node;
-    bool owns_data;
+    bool isParent;
 };
 
 struct sound_seg {
@@ -105,9 +111,6 @@ void tr_destroy(struct sound_seg* track) {
     struct sound_seg_node* current = track->head;
     while (current) {
         struct sound_seg_node* next = current->next;
-        if (current->owns_data) { // This node owns the sample
-            free(current->sample);
-        }
         free(current);
         current = next;
     }
@@ -134,51 +137,53 @@ void tr_read(struct sound_seg* track, int16_t* dest, size_t pos, size_t len) {
         i++;
     }
     for (size_t j = 0; j < len && current; j++) {
-        dest[j] = *(current->sample);
+        dest[j] = current->isParent ? current->A.parent_data.sample : *(current->A.child_data.parent_data_address);
         current = current->next;
     }
 }
 
 void tr_write(struct sound_seg* track, const int16_t* src, size_t pos, size_t len) {
-    if (!track || !src || len == 0) return;
+    if (!track|| !src || len == 0) return;
     struct sound_seg_node* current = track->head;
     struct sound_seg_node* prev = NULL;
     size_t i = 0;
+
     while (current && i < pos) {
         prev = current;
-        current = current->next;
+        current = current->next; //Find the current node to start writting to
         i++;
     }
-    while (i < pos) { //Create for sufficient nodes
+
+    while (i < pos) {
         struct sound_seg_node* new_node = malloc(sizeof(struct sound_seg_node));
         if (!new_node) return;
-        new_node->sample = malloc(sizeof(int16_t));
-        if (!new_node->sample) { free(new_node); return; }
-        *new_node->sample = 0;
-        new_node->ref_count = 0;
+        new_node->A.parent_data.sample = 0;
+        new_node->A.parent_data.refCount = 0;
         new_node->next = NULL;
-        new_node->parent_node = NULL;
-        new_node->owns_data = true;
+        new_node->isParent = true;
         if (prev) prev->next = new_node;
         else track->head = new_node;
         prev = new_node;
         i++;
     }
+
     for (size_t j = 0; j < len; j++) {
         if (current) {
-            *current->sample = src[j];
+            if (current->isParent) {
+                current->A.parent_data.sample = src[j];
+            }
+            else {
+                *(current->A.child_data.parent_data_address) = src[j];
+            }
             prev = current;
             current = current->next;
         } else {
             struct sound_seg_node* new_node = malloc(sizeof(struct sound_seg_node));
             if (!new_node) return;
-            new_node->sample = malloc(sizeof(int16_t));
-            if (!new_node->sample) { free(new_node); return; }
-            *new_node->sample = src[j];
-            new_node->ref_count = 0;
+            new_node->A.parent_data.sample = src[j];
+            new_node->A.parent_data.refCount = 0;
             new_node->next = NULL;
-            new_node->parent_node = NULL;
-            new_node->owns_data = true;
+            new_node->isParent = true;
             if (prev) prev->next = new_node;
             else track->head = new_node;
             prev = new_node;
@@ -199,7 +204,7 @@ bool tr_delete_range(struct sound_seg* track, size_t pos, size_t len) {
     if (!current) return false; //out of bound
     struct sound_seg_node* check = current;
     for (size_t j = 0; j < len && check; j++) {
-        if (check->ref_count > 0) {
+        if (check->isParent && check->A.parent_data.refCount > 0) {
             return false;
         }
         check = check->next;
@@ -207,11 +212,8 @@ bool tr_delete_range(struct sound_seg* track, size_t pos, size_t len) {
 
     for (size_t j = 0; j < len && current; j++) {
         struct sound_seg_node* next = current->next;
-        if (current->parent_node != NULL) {
-            current->parent_node->ref_count--;
-        }
-        if (current->owns_data) {
-            free(current->sample);
+        if (!current->isParent) {
+            free(current->A.child_data.parent_data_address);
         }
         free(current);
         current = next;
@@ -313,16 +315,11 @@ void tr_insert(struct sound_seg* src_track, struct sound_seg* dest_track,
     for (size_t j = 0; j < len && src_temp; j++) {
         struct sound_seg_node* new_node = malloc(sizeof(struct sound_seg_node));
         if (!new_node) return;
-        new_node->sample = src_temp->sample;
-        new_node->ref_count = 0;
+        new_node->A.child_data.parent_data_address = &src_temp->A.parent_data.sample;
         new_node->next = NULL;
-        new_node->owns_data = false;
-        new_node->parent_node = src_temp;
-        if (src_temp->ref_count == 0) {
-            src_temp->ref_count = 1;
-        }
-        else {
-            src_temp->ref_count++;
+        new_node->isParent = false;
+        if (src_temp->isParent) {
+            src_temp->A.parent_data.refCount += 1;
         }
         if (!insert_head) insert_head = insert_tail = new_node;
         else {
@@ -343,36 +340,6 @@ void tr_insert(struct sound_seg* src_track, struct sound_seg* dest_track,
 
 }
 
-void print_track(struct sound_seg* track) {
-    if (!track) {
-        printf("Track is NULL\n");
-        return;
-    }
-
-    printf("Track Metadata:\n");
-    printf("Nodes:\n");
-
-    struct sound_seg_node* current = track->head;
-    int index = 0;
-    if (!current) {
-        printf("  (Empty track)\n");
-        return;
-    }
-
-    while (current) {
-        printf("  Node %d:\n", index);
-        printf("    Sample Value: %d\n", *(current->sample));
-        printf("    Ref Count: %d\n", current->ref_count);
-        if (current->parent_node) {
-            printf("    Parent Sample Value: %d\n", *(current->parent_node->sample));
-        } else {
-            printf("    Parent: None\n");
-        }
-        current = current->next;
-        index++;
-    }
-    printf("\n");
-}
 
 int main(int argc, char** argv) {
 
