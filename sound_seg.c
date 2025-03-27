@@ -30,6 +30,7 @@ struct sound_seg_node {
 struct sound_seg {
     struct sound_seg_node* head;
 };
+struct sound_seg_node* parent_node = NULL;
 #pragma pack(pop)
 
 
@@ -334,7 +335,7 @@ void tr_insert(struct sound_seg* src_track, struct sound_seg* dest_track,
     // }
     struct sound_seg_node* insert_head = NULL;
     struct sound_seg_node* insert_tail = NULL;
-    struct sound_seg_node* parent_node = NULL;
+
     struct sound_seg_node* src_temp = src_current;
     for (size_t j = 0; j < len && src_temp; j++) {
         struct sound_seg_node* new_node = malloc(sizeof(struct sound_seg_node));
