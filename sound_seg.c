@@ -217,7 +217,6 @@ bool tr_delete_range(struct sound_seg* track, size_t pos, size_t len) {
         }
         free(current);
         current = next;
-        track->total_samples--;
     }
     if (prev) prev->next = current;
     else track->head = current;
@@ -342,7 +341,6 @@ void tr_insert(struct sound_seg* src_track, struct sound_seg* dest_track,
         } else {
             dest_track->head = insert_head;
         }
-        dest_track->total_samples += len;
     }
 
 }
@@ -354,7 +352,6 @@ void print_track(struct sound_seg* track) {
     }
 
     printf("Track Metadata:\n");
-    printf("Total Samples: %zu\n", track->total_samples);
     printf("Nodes:\n");
 
     struct sound_seg_node* current = track->head;
