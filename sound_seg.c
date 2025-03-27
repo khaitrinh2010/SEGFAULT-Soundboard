@@ -122,22 +122,7 @@ void tr_write(struct sound_seg* track, const int16_t* src, size_t pos, size_t le
     if (!track || !src) return;
     if (track->total_len < pos + len) track->total_len = pos + len;
 
-    if (!track->head) {
-        struct node* new_node = malloc(sizeof(struct node));
-        new_node->data = malloc((pos  + len) * sizeof(int16_t));
-        for (size_t i = 0; i < pos; i++) new_node->data[i] = 0;
-        memcpy(new_node->data + pos, src, len * sizeof(int16_t));
-        new_node->len = len;
-        new_node->is_shared = false;
-        new_node->parent = NULL;
-        new_node->ref_count = 0;
-        new_node->next = NULL;
-        track->head = new_node;
-        return;
-    }
-
-    struct node* prev = NULL;
-    struct node* current = track->head;
+    struct node* prev = NULL, *current = track->head;
     size_t offset = 0;
     while (current && offset + current->len <= pos) {
         offset += current->len;
@@ -145,56 +130,127 @@ void tr_write(struct sound_seg* track, const int16_t* src, size_t pos, size_t le
         current = current->next;
     }
 
-    if (offset == pos) {
-        struct node* new_node = malloc(sizeof(struct node));
-        new_node->data = malloc(len * sizeof(int16_t));
-        memcpy(new_node->data, src, len * sizeof(int16_t));
-        new_node->len = len;
-        new_node->is_shared = false;
-        new_node->parent = NULL;
-        new_node->ref_count = 0;
+    struct node* new_node = malloc(sizeof(struct node));
+    new_node->data = malloc(len * sizeof(int16_t));
+    memcpy(new_node->data, src, len * sizeof(int16_t));
+    new_node->len = len;
+    new_node->is_shared = false;
+    new_node->parent = NULL;
+    new_node->ref_count = 0;
+
+    if (!current || offset == pos) {
         new_node->next = current;
         if (prev) prev->next = new_node;
         else track->head = new_node;
-    } else {
-        // Split the node if necessary
-        size_t split_pos = pos - offset;
-        struct node* left = malloc(sizeof(struct node));
-        left->data = malloc(split_pos * sizeof(int16_t));
-        memcpy(left->data, current->data, split_pos * sizeof(int16_t));
-        left->len = split_pos;
-        left->is_shared = current->is_shared;
-        left->parent = current->parent;
-        left->ref_count = 0;
-        left->next = NULL;
+        return;
+    }
+
+    size_t split_pos = pos - offset;
+    struct node* left = malloc(sizeof(struct node));
+    left->data = malloc(split_pos * sizeof(int16_t));
+    memcpy(left->data, current->data, split_pos * sizeof(int16_t));
+    left->len = split_pos;
+    left->is_shared = current->is_shared;
+    left->parent = current->parent;
+    left->ref_count = 0;
+
+    struct node* right = malloc(sizeof(struct node));
+    right->data = malloc((current->len - split_pos) * sizeof(int16_t));
+    memcpy(right->data, current->data + split_pos, (current->len - split_pos) * sizeof(int16_t));
+    right->len = current->len - split_pos;
+    right->is_shared = current->is_shared;
+    right->parent = current->parent;
+    right->ref_count = 0;
+    right->next = current->next;
+
+    left->next = new_node;
+    new_node->next = right;
+
+    if (current->is_shared && current->parent)
+        current->parent->ref_count--;
+
+    if (prev) prev->next = left;
+    else track->head = left;
+
+    free(current->data);
+    free(current);
+}
+
+void tr_insert(struct sound_seg* src, struct sound_seg* dest, size_t destpos, size_t srcpos, size_t len) {
+    if (!src || !dest || srcpos + len > src->total_len) return;
+    struct node* cur = src->head;
+    size_t offset = 0;
+    while (cur && offset + cur->len <= srcpos) {
+        offset += cur->len;
+        cur = cur->next;
+    }
+    size_t start = srcpos - offset, copied = 0;
+    struct node* insert_head = NULL, *insert_tail = NULL;
+    while (cur && copied < len) {
+        size_t available = cur->len - start;
+        size_t to_copy = (len - copied < available) ? len - copied : available;
 
         struct node* new_node = malloc(sizeof(struct node));
-        new_node->data = malloc(len * sizeof(int16_t));
-        memcpy(new_node->data, src, len * sizeof(int16_t));
-        new_node->len = len;
-        new_node->is_shared = false;
-        new_node->parent = NULL;
+        new_node->data = cur->data + start;
+        new_node->len = to_copy;
+        new_node->is_shared = true;
+        new_node->parent = cur;
         new_node->ref_count = 0;
+        cur->ref_count++;
+        new_node->next = NULL;
+
+        if (!insert_head) insert_head = insert_tail = new_node;
+        else {
+            insert_tail->next = new_node;
+            insert_tail = new_node;
+        }
+        copied += to_copy;
+        cur = cur->next;
+        start = 0;
+    }
+
+    struct node* prev = NULL, *curr = dest->head;
+    size_t pos = 0;
+    while (curr && pos + curr->len <= destpos) {
+        pos += curr->len;
+        prev = curr;
+        curr = curr->next;
+    }
+
+    if (!curr || pos == destpos) {
+        insert_tail->next = curr;
+        if (prev) prev->next = insert_head;
+        else dest->head = insert_head;
+    } else {
+        size_t split = destpos - pos;
+        struct node* left = malloc(sizeof(struct node));
+        left->data = malloc(split * sizeof(int16_t));
+        memcpy(left->data, curr->data, split * sizeof(int16_t));
+        left->len = split;
+        left->is_shared = curr->is_shared;
+        left->parent = curr->parent;
+        left->ref_count = 0;
 
         struct node* right = malloc(sizeof(struct node));
-        right->data = malloc((current->len - split_pos) * sizeof(int16_t));
-        memcpy(right->data, current->data + split_pos, (current->len - split_pos) * sizeof(int16_t));
-        right->len = current->len - split_pos;
-        right->is_shared = current->is_shared;
-        right->parent = current->parent;
+        right->data = malloc((curr->len - split) * sizeof(int16_t));
+        memcpy(right->data, curr->data + split, (curr->len - split) * sizeof(int16_t));
+        right->len = curr->len - split;
+        right->is_shared = curr->is_shared;
+        right->parent = curr->parent;
         right->ref_count = 0;
+        right->next = curr->next;
 
-        left->next = new_node;
-        new_node->next = right;
-        right->next = current->next;
-
-        if (current->is_shared && current->parent) current->parent->ref_count--;
+        left->next = insert_head;
+        insert_tail->next = right;
 
         if (prev) prev->next = left;
-        else track->head = left;
-        free(current->data);
-        free(current);
+        else dest->head = left;
+
+        if (curr->is_shared && curr->parent) curr->parent->ref_count--;
+        free(curr->data);
+        free(curr);
     }
+    dest->total_len += len;
 }
 
 bool tr_delete_range(struct sound_seg* track, size_t pos, size_t len) {
@@ -319,79 +375,7 @@ char* tr_identify(const struct sound_seg* target, const struct sound_seg* ad) {
     return result;
 }
 
-void tr_insert(struct sound_seg* src_track, struct sound_seg* dest_track,
-              size_t destpos, size_t srcpos, size_t len) {
-    if (!src_track || !dest_track || srcpos + len > src_track->total_len) return;
 
-    // Find source node
-    struct node* src_current = src_track->head;
-    size_t src_offset = 0;
-    while (src_current && src_offset + src_current->len <= srcpos) {
-        src_offset += src_current->len;
-        src_current = src_current->next;
-    }
-    size_t src_start = srcpos - src_offset;
-
-    // Create a new node for the inserted portion
-    struct node* insert_node = malloc(sizeof(struct node));
-    insert_node->data = src_current->data + src_start;
-    insert_node->len = len;
-    insert_node->is_shared = true;
-    insert_node->parent = src_current;
-    insert_node->ref_count = 0;
-    insert_node->next = NULL;
-    src_current->ref_count++;
-
-    // Insert into destination track
-    if (!dest_track->head || destpos == 0) {
-        insert_node->next = dest_track->head;
-        dest_track->head = insert_node;
-        dest_track->total_len += len;
-    } else {
-        struct node* prev = NULL;
-        struct node* current = dest_track->head;
-        size_t offset = 0;
-        while (current && offset + current->len <= destpos) {
-            offset += current->len;
-            prev = current;
-            current = current->next;
-        }
-
-        if (offset == destpos) {
-            insert_node->next = current;
-            if (prev) prev->next = insert_node;
-            else dest_track->head = insert_node;
-        } else {
-            size_t split_pos = destpos - offset;
-            struct node* left = malloc(sizeof(struct node));
-            left->data = malloc(split_pos * sizeof(int16_t));
-            memcpy(left->data, current->data, split_pos * sizeof(int16_t));
-            left->len = split_pos;
-            left->is_shared = current->is_shared;
-            left->parent = current->parent;
-            left->ref_count = 0;
-
-            struct node* right = malloc(sizeof(struct node));
-            right->data = malloc((current->len - split_pos) * sizeof(int16_t));
-            memcpy(right->data, current->data + split_pos, (current->len - split_pos) * sizeof(int16_t));
-            right->len = current->len - split_pos;
-            right->is_shared = current->is_shared;
-            right->parent = current->parent;
-            right->ref_count = 0;
-            right->next = current->next;
-
-            left->next = insert_node;
-            insert_node->next = right;
-            if (prev) prev->next = left;
-            else dest_track->head = left;
-
-            if (current->is_shared && current->parent) current->parent->ref_count--;
-            free(current->data);
-            free(current);
-        }
-        dest_track->total_len += len;
-    }
-}
 
 int main(void) {
 
