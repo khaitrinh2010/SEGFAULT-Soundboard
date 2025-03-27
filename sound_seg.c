@@ -58,9 +58,8 @@ size_t tr_length(struct sound_seg* track) {
 void tr_resize(struct sound_seg* track, size_t new_capacity) {
     if (!track || new_capacity <= track->capacity) return;
     struct sound_seg_node* new_nodes = realloc(track->nodes, new_capacity * sizeof(struct sound_seg_node));
-    if (!new_nodes) return; // Handle allocation failure gracefully
+    if (!new_nodes) return;
     track->nodes = new_nodes;
-    // Initialize new nodes to zeroed parent nodes
     for (size_t i = track->capacity; i < new_capacity; i++) {
         track->nodes[i].A.parent_data.sample = 0;
         track->nodes[i].A.parent_data.refCount = 0;
@@ -83,16 +82,23 @@ void tr_write(struct sound_seg* track, const int16_t* src, size_t pos, size_t le
     if (!track || !src || len == 0) return;
     size_t new_length = pos + len;
     if (new_length > track->capacity) {
-        tr_resize(track, new_length * 2); // Grow by factor of 2
+        tr_resize(track, new_length * 2);
     }
     if (new_length > track->length) {
+        // Initialize new nodes as parents
+        for (size_t i = track->length; i < new_length; i++) {
+            track->nodes[i].A.parent_data.sample = 0;
+            track->nodes[i].A.parent_data.refCount = 0;
+            track->nodes[i].isParent = true;
+        }
         track->length = new_length;
     }
     for (size_t i = 0; i < len; i++) {
-        struct sound_seg_node* node = &track->nodes[pos + i];
+        struct sounderação_seg_node* node = &track->nodes[pos + i];
         if (node->isParent) {
-            node->A.parent_data.sample = src[i];
+            node->A.parent_data.sample = src[i]; // Update parent's data directly
         } else {
+            // Update the parent's data through the child's reference
             *(node->A.child_data.parent_data_address) = src[i];
         }
     }
@@ -105,7 +111,7 @@ bool tr_delete_range(struct sound_seg* track, size_t pos, size_t len) {
     // Check if any parent nodes in range have references
     for (size_t i = pos; i < end; i++) {
         if (track->nodes[i].isParent && track->nodes[i].A.parent_data.refCount > 0) {
-            return false;
+            return false; // Can't delete a parent with children
         }
     }
 
@@ -137,12 +143,12 @@ void tr_insert(struct sound_seg* src_track, struct sound_seg* dest_track, size_t
                 (dest_track->length - destpos) * sizeof(struct sound_seg_node));
     }
 
-    // Insert nodes as children referencing src_track's parents
+    // Create new child nodes in dest_track referencing src_track's parents
     for (size_t i = 0; i < len; i++) {
         struct sound_seg_node* src_node = &src_track->nodes[srcpos + i];
         struct sound_seg_node* parent = src_node;
         while (!parent->isParent && parent->A.child_data.parent) {
-            parent = parent->A.child_data.parent;
+            parent = parent->A.child_data.parent; // Find the ultimate parent
         }
         struct sound_seg_node* dest_node = &dest_track->nodes[destpos + i];
         dest_node->isParent = false;
@@ -150,9 +156,8 @@ void tr_insert(struct sound_seg* src_track, struct sound_seg* dest_track, size_t
         dest_node->A.child_data.parent_data_address = &parent->A.parent_data.sample;
         parent->A.parent_data.refCount++;
     }
-    dest_track->length = new_length > dest_track->length ? new_length : dest_track->length;
+    dest_track->length = new_length;
 }
-
 double compute_cross_correlation(const int16_t* target, const int16_t* ad, size_t len) {
     double sum_product = 0.0;
     double sum_ad_sq = 0.0;
