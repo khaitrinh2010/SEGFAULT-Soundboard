@@ -320,7 +320,7 @@ void tr_insert(struct sound_seg* src_track, struct sound_seg* dest_track,
         struct sound_seg_node* new_node = malloc(sizeof(struct sound_seg_node));
         if (!new_node) return;
         new_node->A.child_data.parent_data_address = &src_temp->A.parent_data.sample;
-        new_node->A.child_data.parent = &src_temp;
+        new_node->A.child_data.parent = src_temp;
         new_node->next = NULL;
         new_node->isParent = false;
         if (src_temp->isParent) {
