@@ -24,6 +24,7 @@ struct sound_seg_node {
     } A;
     struct sound_seg_node* next;
     bool isParent;
+
 };
 
 struct sound_seg {
@@ -333,11 +334,12 @@ void tr_insert(struct sound_seg* src_track, struct sound_seg* dest_track,
     // }
     struct sound_seg_node* insert_head = NULL;
     struct sound_seg_node* insert_tail = NULL;
+    struct sound_seg_node* parent_node = NULL;
     struct sound_seg_node* src_temp = src_current;
     for (size_t j = 0; j < len && src_temp; j++) {
         struct sound_seg_node* new_node = malloc(sizeof(struct sound_seg_node));
         if (!new_node) return;
-        struct sound_seg_node* parent_node = src_temp;
+        parent_node = src_temp;
         while (!parent_node->isParent && parent_node->A.child_data.parent) {
             parent_node = parent_node->A.child_data.parent;
         }
