@@ -307,6 +307,8 @@ void tr_insert(struct sound_seg* src_track, struct sound_seg* dest_track,
         i++;
     }
     if (!src_current) return;
+
+    size_t dest_len = tr_length(dest_track);
     struct sound_seg_node* dest_current = dest_track->head;
     struct sound_seg_node* dest_prev = NULL;
     i = 0;
@@ -315,27 +317,37 @@ void tr_insert(struct sound_seg* src_track, struct sound_seg* dest_track,
         dest_current = dest_current->next;
         i++;
     }
+
+    // Pad destination track if destpos > current length
+    while (i < destpos) {
+        struct sound_seg_node* new_node = malloc(sizeof(struct sound_seg_node));
+        if (!new_node) return;
+        new_node->A.parent_data.sample = 0;
+        new_node->A.parent_data.refCount = 0;
+        new_node->next = NULL;
+        new_node->isParent = true;
+        if (dest_prev) dest_prev->next = new_node;
+        else dest_track->head = new_node;
+        dest_prev = new_node;
+        i++;
+    }
+
+    // Insert child nodes referencing source track's parent data
     struct sound_seg_node* insert_head = NULL;
     struct sound_seg_node* insert_tail = NULL;
     struct sound_seg_node* src_temp = src_current;
     for (size_t j = 0; j < len && src_temp; j++) {
         struct sound_seg_node* new_node = malloc(sizeof(struct sound_seg_node));
         if (!new_node) return;
-        if (src_temp->isParent && src_temp->A.child_data.parent) {
-            new_node->A.child_data.parent_data_address = &src_temp->A.parent_data.sample;
+        struct sound_seg_node* parent_node = src_temp;
+        while (!parent_node->isParent && parent_node->A.child_data.parent) {
+            parent_node = parent_node->A.child_data.parent;
         }
-        else {
-            new_node->A.child_data.parent_data_address  = src_temp->A.child_data.parent_data_address;
-        }
-        new_node->A.child_data.parent = src_temp;
+        new_node->A.child_data.parent_data_address = &parent_node->A.parent_data.sample;
+        new_node->A.child_data.parent = parent_node;
         new_node->next = NULL;
         new_node->isParent = false;
-        if (src_temp->isParent) {
-            src_temp->A.parent_data.refCount += 1;
-        }
-        else {
-            src_temp->A.child_data.parent->A.parent_data.refCount -= 1;
-        }
+        parent_node->A.parent_data.refCount++;
         if (!insert_head) insert_head = insert_tail = new_node;
         else {
             insert_tail->next = new_node;
@@ -346,11 +358,8 @@ void tr_insert(struct sound_seg* src_track, struct sound_seg* dest_track,
 
     if (insert_head) {
         insert_tail->next = dest_current;
-        if (dest_prev) {
-            dest_prev->next = insert_head;
-        } else {
-            dest_track->head = insert_head;
-        }
+        if (dest_prev) dest_prev->next = insert_head;
+        else dest_track->head = insert_head;
     }
 }
 
@@ -377,6 +386,8 @@ int main(int argc, char** argv) {
     tr_write(s3, ((int16_t[]){-9,-5,20,-12,0,-18,-1,-19,-6}), 0, 9);
     tr_write(s3, ((int16_t[]){11,5,-2,7,-15,8,-13,-1,7}), 0, 9);
     tr_insert(s2, s1, 9, 1, 1);
+    print_track(s1);
+    printf("\n");
     tr_write(s2, ((int16_t[]){-20,5,12,0,11,-11}), 0, 6);
     tr_write(s3, ((int16_t[]){-12,-18,-14,-10,5,-9,8,16,-6}), 0, 9);
     tr_delete_range(s3, 5, 3); //expect return True
