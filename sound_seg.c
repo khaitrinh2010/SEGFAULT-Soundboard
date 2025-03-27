@@ -363,17 +363,7 @@ void tr_insert(struct sound_seg* src_track, struct sound_seg* dest_track,
     }
 }
 
-void print_track(struct sound_seg* track) {
-    struct sound_seg_node *current = track->head;
-    while (current) {
-        if (current->isParent) {
-            printf("%d ", current->A.parent_data.sample);
-        } else {
-            printf("%d ", *(current->A.child_data.parent_data_address));
-        }
-        current = current->next;
-    }
-}
+
 
 int main(int argc, char** argv) {
     struct sound_seg* s0 = tr_init();
