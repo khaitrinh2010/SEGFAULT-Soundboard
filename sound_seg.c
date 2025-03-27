@@ -25,9 +25,9 @@ struct sound_seg_node {
 #pragma pack(pop)
 
 struct sound_seg {
-    struct sound_seg_node* nodes; // Array of nodes
-    size_t length;                // Current number of nodes
-    size_t capacity;              // Total allocated size
+    struct sound_seg_node* nodes;
+    size_t length;
+    size_t capacity;
 };
 
 struct sound_seg* tr_init(void) {
@@ -41,12 +41,6 @@ struct sound_seg* tr_init(void) {
 
 void tr_destroy(struct sound_seg* track) {
     if (!track) return;
-    // Decrease refCount for any child nodes
-    for (size_t i = 0; i < track->length; i++) {
-        if (!track->nodes[i].isParent && track->nodes[i].A.child_data.parent) {
-            track->nodes[i].A.child_data.parent->A.parent_data.refCount--;
-        }
-    }
     free(track->nodes);
     free(track);
 }
