@@ -321,12 +321,20 @@ void tr_insert(struct sound_seg* src_track, struct sound_seg* dest_track,
     for (size_t j = 0; j < len && src_temp; j++) {
         struct sound_seg_node* new_node = malloc(sizeof(struct sound_seg_node));
         if (!new_node) return;
-        new_node->A.child_data.parent_data_address = &src_temp->A.parent_data.sample;
+        if (src_temp->isParent && src_temp->A.child_data.parent) {
+            new_node->A.child_data.parent_data_address = &src_temp->A.parent_data.sample;
+        }
+        else {
+            new_node->A.child_data.parent_data_address  = src_temp->A.child_data.parent_data_address;
+        }
         new_node->A.child_data.parent = src_temp;
         new_node->next = NULL;
         new_node->isParent = false;
         if (src_temp->isParent) {
             src_temp->A.parent_data.refCount += 1;
+        }
+        else {
+            src_temp->A.child_data.parent->A.parent_data.refCount -= 1;
         }
         if (!insert_head) insert_head = insert_tail = new_node;
         else {
@@ -346,20 +354,40 @@ void tr_insert(struct sound_seg* src_track, struct sound_seg* dest_track,
     }
 }
 
+void print_track(struct sound_seg* track) {
+    struct sound_seg_node *current = track->head;
+    while (current) {
+        if (current->isParent) {
+            printf("%d ", current->A.parent_data.sample);
+        } else {
+            printf("%d ", *(current->A.child_data.parent_data_address));
+        }
+        current = current->next;
+    }
+}
+
 int main(int argc, char** argv) {
     struct sound_seg* s0 = tr_init();
     tr_write(s0, ((int16_t[]){}), 0, 0);
     struct sound_seg* s1 = tr_init();
-    tr_write(s1, ((int16_t[]){-8,-14,13,-3}), 0, 4);
-    tr_write(s1, ((int16_t[]){-13,-5,6,18}), 0, 4);
-    tr_write(s0, ((int16_t[]){-4,7,-3,-20,-20}), 0, 5);
-    tr_insert(s1, s0, 1, 1, 2);
-    tr_write(s0, ((int16_t[]){12,-18,9,13,-3,9,3}), 0, 7);
-    tr_write(s1, ((int16_t[]){-15,-4,16,-14}), 0, 4);
-    tr_delete_range(s0, 0, 6); //expect return True
-    tr_write(s0, ((int16_t[]){-20,9,-18,15,16}), 1, 5);
-    tr_delete_range(s1, 2, 1); //expect return True
-    //expected True, actual False
+    tr_write(s1, ((int16_t[]){3,18,11,-8,5,-1,-18,-15,0,-6,-5,-14,4}), 0, 13);
+    struct sound_seg* s2 = tr_init();
+    tr_write(s2, ((int16_t[]){2,19,5,13,-10,-3}), 0, 6);
+    struct sound_seg* s3 = tr_init();
+    tr_write(s3, ((int16_t[]){-9,-5,20,-12,0,-18,-1,-19,-6}), 0, 9);
+    tr_write(s3, ((int16_t[]){11,5,-2,7,-15,8,-13,-1,7}), 0, 9);
+    tr_insert(s2, s1, 9, 1, 1);
+    tr_write(s2, ((int16_t[]){-20,5,12,0,11,-11}), 0, 6);
+    tr_write(s3, ((int16_t[]){-12,-18,-14,-10,5,-9,8,16,-6}), 0, 9);
+    tr_delete_range(s3, 5, 3); //expect return True
+    tr_insert(s1, s0, 0, 7, 3);
+    tr_write(s1, ((int16_t[]){-10,-6,-7,18,2,-12,12,16,-15,-13,20,-17,17,1}), 0, 14);
+    tr_write(s0, ((int16_t[]){17,-16,-11}), 0, 3);
+    int16_t FAILING_READ[14];
+    tr_read(s1, FAILING_READ, 0, 14);
+    //expected [-10  -6  -7  18   2 -12  12  17 -16 -11  20 -17  17   1], actual [-10  -6  -7  18   2 -12  12  17 -16 -13  20 -17  17   1]!
     tr_destroy(s0);
     tr_destroy(s1);
+    tr_destroy(s2);
+    tr_destroy(s3);
 }
