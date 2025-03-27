@@ -212,9 +212,6 @@ bool tr_delete_range(struct sound_seg* track, size_t pos, size_t len) {
 
     for (size_t j = 0; j < len && current; j++) {
         struct sound_seg_node* next = current->next;
-        if (!current->isParent) {
-            free(current->A.child_data.parent_data_address);
-        }
         free(current);
         current = next;
     }
