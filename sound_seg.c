@@ -162,7 +162,6 @@ void tr_write(struct sound_seg* track, const int16_t* src, size_t pos, size_t le
         if (prev) prev->next = new_node;
         else track->head = new_node;
         prev = new_node;
-        track->total_samples++;
         i++;
     }
     for (size_t j = 0; j < len; j++) {
@@ -183,13 +182,12 @@ void tr_write(struct sound_seg* track, const int16_t* src, size_t pos, size_t le
             if (prev) prev->next = new_node;
             else track->head = new_node;
             prev = new_node;
-            track->total_samples++;
         }
     }
 }
 
 bool tr_delete_range(struct sound_seg* track, size_t pos, size_t len) {
-    if (!track || len == 0 || pos >= track->total_samples) return false;
+    if (!track || len == 0 || pos >= tr_length(track)) return false;
     struct sound_seg_node* current = track->head;
     struct sound_seg_node* prev = NULL;
     size_t i = 0;
