@@ -10,6 +10,7 @@
 #define OFFSET_TO_AUDIO_DATA 44
 
 //SIGNAL 11: occurs when program attempts to access memory it does not have permission to access
+#pragma pack(push, 1)
 struct sound_seg_node {
     union A {
         struct  {
@@ -28,6 +29,7 @@ struct sound_seg_node {
 struct sound_seg {
     struct sound_seg_node* head;
 };
+#pragma pack(pop)
 
 
 // Load a WAV file into buffer
