@@ -12,18 +12,11 @@
 //SIGNAL 11: occurs when program attempts to access memory it does not have permission to access
 #pragma pack(push, 1)
 struct sound_seg_node {
-    union A {
-        struct  {
-            int refCount;
-            int16_t sample;
-        } parent_data;
-        struct {
-            struct sound_seg_node *parent;
-            int16_t* parent_data_address;
-        }  child_data        ;
-    } A;
+    int16_t* sample;
+    short ref_count;
     struct sound_seg_node* next;
-    bool isParent;
+    struct sound_seg_node* parent_node;
+    bool owns_data;
 };
 
 struct sound_seg {
@@ -114,6 +107,9 @@ void tr_destroy(struct sound_seg* track) {
     struct sound_seg_node* current = track->head;
     while (current) {
         struct sound_seg_node* next = current->next;
+        if (current->owns_data) { // This node owns the sample
+            free(current->sample);
+        }
         free(current);
         current = next;
     }
@@ -140,53 +136,51 @@ void tr_read(struct sound_seg* track, int16_t* dest, size_t pos, size_t len) {
         i++;
     }
     for (size_t j = 0; j < len && current; j++) {
-        dest[j] = current->isParent ? current->A.parent_data.sample : *(current->A.child_data.parent_data_address);
+        dest[j] = *(current->sample);
         current = current->next;
     }
 }
 
 void tr_write(struct sound_seg* track, const int16_t* src, size_t pos, size_t len) {
-    if (!track|| !src || len == 0) return;
+    if (!track || !src || len == 0) return;
     struct sound_seg_node* current = track->head;
     struct sound_seg_node* prev = NULL;
     size_t i = 0;
-
     while (current && i < pos) {
         prev = current;
-        current = current->next; //Find the current node to start writting to
+        current = current->next;
         i++;
     }
-
-    while (i < pos) {
+    while (i < pos) { //Create for sufficient nodes
         struct sound_seg_node* new_node = malloc(sizeof(struct sound_seg_node));
         if (!new_node) return;
-        new_node->A.parent_data.sample = 0;
-        new_node->A.parent_data.refCount = 0;
+        new_node->sample = malloc(sizeof(int16_t));
+        if (!new_node->sample) { free(new_node); return; }
+        *new_node->sample = 0;
+        new_node->ref_count = 0;
         new_node->next = NULL;
-        new_node->isParent = true;
+        new_node->parent_node = NULL;
+        new_node->owns_data = true;
         if (prev) prev->next = new_node;
         else track->head = new_node;
         prev = new_node;
         i++;
     }
-
     for (size_t j = 0; j < len; j++) {
         if (current) {
-            if (current->isParent) {
-                current->A.parent_data.sample = src[j];
-            }
-            else {
-                *(current->A.child_data.parent_data_address) = src[j];
-            }
+            *current->sample = src[j];
             prev = current;
             current = current->next;
         } else {
             struct sound_seg_node* new_node = malloc(sizeof(struct sound_seg_node));
             if (!new_node) return;
-            new_node->A.parent_data.sample = src[j];
-            new_node->A.parent_data.refCount = 0;
+            new_node->sample = malloc(sizeof(int16_t));
+            if (!new_node->sample) { free(new_node); return; }
+            *new_node->sample = src[j];
+            new_node->ref_count = 0;
             new_node->next = NULL;
-            new_node->isParent = true;
+            new_node->parent_node = NULL;
+            new_node->owns_data = true;
             if (prev) prev->next = new_node;
             else track->head = new_node;
             prev = new_node;
@@ -199,34 +193,34 @@ bool tr_delete_range(struct sound_seg* track, size_t pos, size_t len) {
     struct sound_seg_node* current = track->head;
     struct sound_seg_node* prev = NULL;
     size_t i = 0;
-
     while (current && i < pos) {
         prev = current;
         current = current->next;
         i++;
     }
-    if (!current) return false;
-
-    // Check if any parent nodes in range have references
+    if (!current) return false; //out of bound
     struct sound_seg_node* check = current;
     for (size_t j = 0; j < len && check; j++) {
-        if (check->isParent && check->A.parent_data.refCount > 0) {
+        if (check->ref_count > 0) {
             return false;
         }
         check = check->next;
     }
 
-    // Delete nodes and update refCount for child nodes
     for (size_t j = 0; j < len && current; j++) {
         struct sound_seg_node* next = current->next;
-        if (!current->isParent && current->A.child_data.parent) {
-            current->A.child_data.parent->A.parent_data.refCount--;
+        if (current->parent_node != NULL) {
+            current->parent_node->ref_count--;
+        }
+        if (current->owns_data) {
+            free(current->sample);
         }
         free(current);
         current = next;
     }
     if (prev) prev->next = current;
     else track->head = current;
+
     return true;
 }
 
@@ -321,12 +315,16 @@ void tr_insert(struct sound_seg* src_track, struct sound_seg* dest_track,
     for (size_t j = 0; j < len && src_temp; j++) {
         struct sound_seg_node* new_node = malloc(sizeof(struct sound_seg_node));
         if (!new_node) return;
-        new_node->A.child_data.parent_data_address = &src_temp->A.parent_data.sample;
-        new_node->A.child_data.parent = src_temp;
+        new_node->sample = src_temp->sample;
+        new_node->ref_count = 0;
         new_node->next = NULL;
-        new_node->isParent = false;
-        if (src_temp->isParent) {
-            src_temp->A.parent_data.refCount += 1;
+        new_node->owns_data = false;
+        new_node->parent_node = src_temp;
+        if (src_temp->ref_count == 0) {
+            src_temp->ref_count = 1;
+        }
+        else {
+            src_temp->ref_count++;
         }
         if (!insert_head) insert_head = insert_tail = new_node;
         else {
@@ -344,22 +342,40 @@ void tr_insert(struct sound_seg* src_track, struct sound_seg* dest_track,
             dest_track->head = insert_head;
         }
     }
+
+}
+
+void print_track(struct sound_seg* track) {
+    if (!track) {
+        printf("Track is NULL\n");
+        return;
+    }
+
+    printf("Track Metadata:\n");
+    printf("Nodes:\n");
+
+    struct sound_seg_node* current = track->head;
+    int index = 0;
+    if (!current) {
+        printf("  (Empty track)\n");
+        return;
+    }
+
+    while (current) {
+        printf("  Node %d:\n", index);
+        printf("    Sample Value: %d\n", *(current->sample));
+        printf("    Ref Count: %d\n", current->ref_count);
+        if (current->parent_node) {
+            printf("    Parent Sample Value: %d\n", *(current->parent_node->sample));
+        } else {
+            printf("    Parent: None\n");
+        }
+        current = current->next;
+        index++;
+    }
+    printf("\n");
 }
 
 int main(int argc, char** argv) {
-    struct sound_seg* s0 = tr_init();
-    tr_write(s0, ((int16_t[]){}), 0, 0);
-    struct sound_seg* s1 = tr_init();
-    tr_write(s1, ((int16_t[]){-8,-14,13,-3}), 0, 4);
-    tr_write(s1, ((int16_t[]){-13,-5,6,18}), 0, 4);
-    tr_write(s0, ((int16_t[]){-4,7,-3,-20,-20}), 0, 5);
-    tr_insert(s1, s0, 1, 1, 2);
-    tr_write(s0, ((int16_t[]){12,-18,9,13,-3,9,3}), 0, 7);
-    tr_write(s1, ((int16_t[]){-15,-4,16,-14}), 0, 4);
-    tr_delete_range(s0, 0, 6); //expect return True
-    tr_write(s0, ((int16_t[]){-20,9,-18,15,16}), 1, 5);
-    tr_delete_range(s1, 2, 1); //expect return True
-    //expected True, actual False
-    tr_destroy(s0);
-    tr_destroy(s1);
+
 }
