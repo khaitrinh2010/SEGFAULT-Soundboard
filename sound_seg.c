@@ -87,25 +87,34 @@ void tr_destroy(struct sound_seg* track) {
 size_t tr_length(struct sound_seg* track) {
     return track ? track->total_len : 0;
 }
-
 void tr_read(struct sound_seg* track, int16_t* dest, size_t pos, size_t len) {
     if (!track || !track->head || pos >= track->total_len) return;
     size_t offset = 0;
     struct node* current = track->head;
-    while (current && offset < pos) {
-        if (offset + current->len > pos) break;
+
+    // Find the node containing pos
+    while (current && offset + current->len <= pos) {
         offset += current->len;
         current = current->next;
     }
+    if (!current) return;
+
     size_t dest_idx = 0;
-    while (current && dest_idx < len) {
-        size_t start = (pos > offset) ? (pos - offset) : 0;
-        size_t copy_len = current->len - start;
-        if (dest_idx + copy_len > len) copy_len = len - dest_idx;
+    size_t remaining = len;
+
+    size_t start = (pos > offset) ? (pos - offset) : 0;
+
+    while (current && remaining > 0) {
+        size_t available = current->len - start;
+        size_t copy_len = available < remaining ? available : remaining;
+
         memcpy(dest + dest_idx, current->data + start, copy_len * sizeof(int16_t));
         dest_idx += copy_len;
+        remaining -= copy_len;
+
         offset += current->len;
         current = current->next;
+        start = 0; // After the first node, start at the beginning of each subsequent node
     }
 }
 
