@@ -94,7 +94,7 @@ void tr_write(struct sound_seg* track, const int16_t* src, size_t pos, size_t le
         track->length = new_length;
     }
     for (size_t i = 0; i < len; i++) {
-        struct sounderação_seg_node* node = &track->nodes[pos + i];
+        struct sound_seg_node * node = &track->nodes[pos + i];
         if (node->isParent) {
             node->A.parent_data.sample = src[i]; // Update parent's data directly
         } else {
