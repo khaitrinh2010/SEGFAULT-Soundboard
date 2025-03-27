@@ -324,6 +324,7 @@ void tr_insert(struct sound_seg* src_track, struct sound_seg* dest_track,
             insert_tail = new_node;
         }
         src_temp = src_temp->next;
+
     }
 
     if (insert_head) {
