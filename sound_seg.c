@@ -12,11 +12,12 @@
 //SIGNAL 11: occurs when program attempts to access memory it does not have permission to access
 struct sound_seg_node {
     union A {
-        struct  {;
+        struct  {
             int refCount;
             int16_t sample;
         } parent_data;
         struct {
+            struct sound_seg_node *parent;
             int16_t* parent_data_address;
         }  child_data        ;
     } A;
@@ -196,12 +197,15 @@ bool tr_delete_range(struct sound_seg* track, size_t pos, size_t len) {
     struct sound_seg_node* current = track->head;
     struct sound_seg_node* prev = NULL;
     size_t i = 0;
+
     while (current && i < pos) {
         prev = current;
         current = current->next;
         i++;
     }
-    if (!current) return false; //out of bound
+    if (!current) return false;
+
+    // Check if any parent nodes in range have references
     struct sound_seg_node* check = current;
     for (size_t j = 0; j < len && check; j++) {
         if (check->isParent && check->A.parent_data.refCount > 0) {
@@ -210,14 +214,17 @@ bool tr_delete_range(struct sound_seg* track, size_t pos, size_t len) {
         check = check->next;
     }
 
+    // Delete nodes and update refCount for child nodes
     for (size_t j = 0; j < len && current; j++) {
         struct sound_seg_node* next = current->next;
+        if (!current->isParent && current->A.child_data.parent) {
+            current->A.child_data.parent->A.parent_data.refCount--;
+        }
         free(current);
         current = next;
     }
     if (prev) prev->next = current;
     else track->head = current;
-
     return true;
 }
 
@@ -313,6 +320,7 @@ void tr_insert(struct sound_seg* src_track, struct sound_seg* dest_track,
         struct sound_seg_node* new_node = malloc(sizeof(struct sound_seg_node));
         if (!new_node) return;
         new_node->A.child_data.parent_data_address = &src_temp->A.parent_data.sample;
+        new_node->A.child_data.parent = &src_temp;
         new_node->next = NULL;
         new_node->isParent = false;
         if (src_temp->isParent) {
@@ -324,7 +332,6 @@ void tr_insert(struct sound_seg* src_track, struct sound_seg* dest_track,
             insert_tail = new_node;
         }
         src_temp = src_temp->next;
-
     }
 
     if (insert_head) {
@@ -338,5 +345,19 @@ void tr_insert(struct sound_seg* src_track, struct sound_seg* dest_track,
 }
 
 int main(int argc, char** argv) {
-
+    struct sound_seg* s0 = tr_init();
+    tr_write(s0, ((int16_t[]){}), 0, 0);
+    struct sound_seg* s1 = tr_init();
+    tr_write(s1, ((int16_t[]){-8,-14,13,-3}), 0, 4);
+    tr_write(s1, ((int16_t[]){-13,-5,6,18}), 0, 4);
+    tr_write(s0, ((int16_t[]){-4,7,-3,-20,-20}), 0, 5);
+    tr_insert(s1, s0, 1, 1, 2);
+    tr_write(s0, ((int16_t[]){12,-18,9,13,-3,9,3}), 0, 7);
+    tr_write(s1, ((int16_t[]){-15,-4,16,-14}), 0, 4);
+    tr_delete_range(s0, 0, 6); //expect return True
+    tr_write(s0, ((int16_t[]){-20,9,-18,15,16}), 1, 5);
+    tr_delete_range(s1, 2, 1); //expect return True
+    //expected True, actual False
+    tr_destroy(s0);
+    tr_destroy(s1);
 }
