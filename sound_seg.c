@@ -156,7 +156,6 @@ void tr_write(struct sound_seg* track, const int16_t* src, size_t pos, size_t le
         if (prev) prev->next = new_node;
         else track->head = new_node;
     } else {
-        // Split the node if necessary
         size_t split_pos = pos - offset;
         struct node* left = malloc(sizeof(struct node));
         left->data = malloc(split_pos * sizeof(int16_t));
@@ -175,17 +174,23 @@ void tr_write(struct sound_seg* track, const int16_t* src, size_t pos, size_t le
         new_node->parent = NULL;
         new_node->ref_count = 0;
 
-        struct node* right = malloc(sizeof(struct node));
-        right->data = malloc((current->len - split_pos) * sizeof(int16_t));
-        memcpy(right->data, current->data + split_pos, (current->len - split_pos) * sizeof(int16_t));
-        right->len = current->len - split_pos;
-        right->is_shared = current->is_shared;
-        right->parent = current->parent;
-        right->ref_count = 0;
+        size_t remaining = current->len - split_pos - len;
+        struct node* right = NULL;
+        if (remaining > 0) {
+            right = malloc(sizeof(struct node));
+            right->data = malloc(remaining * sizeof(int16_t));
+            memcpy(right->data, current->data + split_pos + len, remaining * sizeof(int16_t));
+            right->len = remaining;
+            right->is_shared = current->is_shared;
+            right->parent = current->parent;
+            right->ref_count = 0;
+            right->next = current->next;
+        } else {
+            right = current->next; // No remaining data, link to next node
+        }
 
         left->next = new_node;
         new_node->next = right;
-        right->next = current->next;
 
         if (current->is_shared && current->parent) current->parent->ref_count--;
 
@@ -195,7 +200,6 @@ void tr_write(struct sound_seg* track, const int16_t* src, size_t pos, size_t le
         free(current);
     }
 }
-
 bool tr_delete_range(struct sound_seg* track, size_t pos, size_t len) {
     if (!track || pos + len > track->total_len) return false;
     struct node* prev = NULL;
