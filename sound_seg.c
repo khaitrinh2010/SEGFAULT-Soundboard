@@ -5,37 +5,36 @@
 #include <string.h>
 #include <stdio.h>
 
-// Node structure for the linked list representing a track segment
-struct node {
-    int16_t* data;          // Pointer to the actual audio samples (shared or owned)
-    size_t len;             // Length of this segment
-    bool is_shared;         // True if this is a shared reference (parent/child)
-    struct node* parent;    // Pointer to parent node if this is a child
-    size_t ref_count;       // Number of children referencing this node
-    struct node* next;      // Next segment in the track
+// Structure for tracking shared references
+struct ref {
+    size_t start;           // Start index in this track's data
+    size_t len;             // Length of the shared segment
+    struct sound_seg* parent; // Parent track (NULL if not shared)
+    size_t ref_count;       // Number of children referencing this segment
 };
 
 // Track structure
 struct sound_seg {
-    struct node* head;      // Head of the linked list of segments
-    size_t total_len;       // Total length of the track in samples
+    int16_t* data;          // Contiguous array of samples
+    size_t total_len;       // Total length of samples
+    size_t capacity;        // Allocated size of data array
+    struct ref* refs;       // Array of shared reference metadata
+    size_t ref_count;       // Number of refs
+    size_t ref_capacity;    // Allocated size of refs array
 };
 
-// WAV file interaction (simplified for this example, actual implementation depends on WAV format)
+// WAV file interaction (simplified)
 void wav_load(const char* fname, int16_t* dest) {
-    // Placeholder: In a real scenario, read WAV file into dest, skipping header
     FILE* fp = fopen(fname, "rb");
     if (!fp) return;
-    fseek(fp, 44, SEEK_SET); // Skip WAV header (assuming 44-byte header)
-    fread(dest, sizeof(int16_t), 8000, fp); // Example: read 8000 samples
+    fseek(fp, 44, SEEK_SET);
+    fread(dest, sizeof(int16_t), 8000, fp);
     fclose(fp);
 }
 
 void wav_save(const char* fname, const int16_t* src, size_t len) {
-    // Placeholder: Write src to a WAV file with a proper header
     FILE* fp = fopen(fname, "wb");
     if (!fp) return;
-    // Write a minimal WAV header (PCM, 16-bit, mono, 8000Hz)
     uint32_t sample_rate = 8000;
     uint32_t byte_rate = sample_rate * 2;
     uint32_t data_size = len * 2;
@@ -45,9 +44,9 @@ void wav_save(const char* fname, const int16_t* src, size_t len) {
     fwrite("WAVEfmt ", 1, 8, fp);
     uint32_t fmt_size = 16;
     fwrite(&fmt_size, 4, 1, fp);
-    uint16_t audio_format = 1; // PCM
+    uint16_t audio_format = 1;
     fwrite(&audio_format, 2, 1, fp);
-    uint16_t num_channels = 1; // Mono
+    uint16_t num_channels = 1;
     fwrite(&num_channels, 2, 1, fp);
     fwrite(&sample_rate, 4, 1, fp);
     fwrite(&byte_rate, 4, 1, fp);
@@ -61,276 +60,107 @@ void wav_save(const char* fname, const int16_t* src, size_t len) {
     fclose(fp);
 }
 
-// Track management functions
 struct sound_seg* tr_init(void) {
     struct sound_seg* track = malloc(sizeof(struct sound_seg));
     if (!track) return NULL;
-    track->head = NULL;
+    track->data = NULL;
     track->total_len = 0;
+    track->capacity = 0;
+    track->refs = NULL;
+    track->ref_count = 0;
+    track->ref_capacity = 0;
     return track;
 }
 
 void tr_destroy(struct sound_seg* track) {
     if (!track) return;
-    struct node* current = track->head;
-    while (current) {
-        struct node* next = current->next;
-        if (!current->is_shared || current->ref_count == 0) {
-            free(current->data); // Free data only if not shared or no children
+    // Only free data if no children reference it
+    bool can_free_data = true;
+    for (size_t i = 0; i < track->ref_count; i++) {
+        if (track->refs[i].parent == NULL && track->refs[i].ref_count > 0) {
+            can_free_data = false;
+            break;
         }
-        free(current);
-        current = next;
     }
+    if (can_free_data) free(track->data);
+    free(track->refs);
     free(track);
 }
 
 size_t tr_length(struct sound_seg* track) {
     return track ? track->total_len : 0;
 }
+
 void tr_read(struct sound_seg* track, int16_t* dest, size_t pos, size_t len) {
-    if (!track || !track->head || pos >= track->total_len) return;
-    size_t offset = 0;
-    struct node* current = track->head;
-
-    // Find the node containing pos
-    while (current && offset + current->len <= pos) {
-        offset += current->len;
-        current = current->next;
-    }
-    if (!current) return;
-
-    size_t dest_idx = 0;
-    size_t remaining = len;
-
-    size_t start = (pos > offset) ? (pos - offset) : 0;
-
-    while (current && remaining > 0) {
-        size_t available = current->len - start;
-        size_t copy_len = available < remaining ? available : remaining;
-
-        memcpy(dest + dest_idx, current->data + start, copy_len * sizeof(int16_t));
-        dest_idx += copy_len;
-        remaining -= copy_len;
-
-        offset += current->len;
-        current = current->next;
-        start = 0; // After the first node, start at the beginning of each subsequent node
-    }
+    if (!track || pos >= track->total_len) return;
+    size_t end = pos + len > track->total_len ? track->total_len : pos + len;
+    memcpy(dest, track->data + pos, (end - pos) * sizeof(int16_t));
 }
 
 void tr_write(struct sound_seg* track, const int16_t* src, size_t pos, size_t len) {
     if (!track || !src) return;
-    if (track->total_len < pos + len) track->total_len = pos + len;
+    size_t new_len = pos + len > track->total_len ? pos + len : track->total_len;
 
-    struct node* prev = NULL, *current = track->head;
-    size_t offset = 0;
-    while (current && offset + current->len <= pos) {
-        offset += current->len;
-        prev = current;
-        current = current->next;
+    // Resize data array if necessary
+    if (new_len > track->capacity) {
+        size_t new_capacity = track->capacity ? track->capacity * 2 : 16;
+        while (new_capacity < new_len) new_capacity *= 2;
+        int16_t* new_data = realloc(track->data, new_capacity * sizeof(int16_t));
+        if (!new_data) return; // Memory allocation failure
+        track->data = new_data;
+        track->capacity = new_capacity;
     }
 
-    struct node* new_node = malloc(sizeof(struct node));
-    new_node->data = malloc(len * sizeof(int16_t));
-    memcpy(new_node->data, src, len * sizeof(int16_t));
-    new_node->len = len;
-    new_node->is_shared = false;
-    new_node->parent = NULL;
-    new_node->ref_count = 0;
+    // Copy new data
+    memcpy(track->data + pos, src, len * sizeof(int16_t));
+    track->total_len = new_len;
 
-    if (!current || offset == pos) {
-        new_node->next = current;
-        if (prev) prev->next = new_node;
-        else track->head = new_node;
-        return;
-    }
-
-    size_t split_pos = pos - offset;
-    struct node* left = malloc(sizeof(struct node));
-    left->data = malloc(split_pos * sizeof(int16_t));
-    memcpy(left->data, current->data, split_pos * sizeof(int16_t));
-    left->len = split_pos;
-    left->is_shared = current->is_shared;
-    left->parent = current->parent;
-    left->ref_count = 0;
-
-    struct node* right = malloc(sizeof(struct node));
-    right->data = malloc((current->len - split_pos) * sizeof(int16_t));
-    memcpy(right->data, current->data + split_pos, (current->len - split_pos) * sizeof(int16_t));
-    right->len = current->len - split_pos;
-    right->is_shared = current->is_shared;
-    right->parent = current->parent;
-    right->ref_count = 0;
-    right->next = current->next;
-
-    left->next = new_node;
-    new_node->next = right;
-
-    if (current->is_shared && current->parent)
-        current->parent->ref_count--;
-
-    if (prev) prev->next = left;
-    else track->head = left;
-
-    free(current->data);
-    free(current);
-}
-
-void tr_insert(struct sound_seg* src, struct sound_seg* dest, size_t destpos, size_t srcpos, size_t len) {
-    if (!src || !dest || srcpos + len > src->total_len) return;
-    struct node* cur = src->head;
-    size_t offset = 0;
-    while (cur && offset + cur->len <= srcpos) {
-        offset += cur->len;
-        cur = cur->next;
-    }
-    size_t start = srcpos - offset, copied = 0;
-    struct node* insert_head = NULL, *insert_tail = NULL;
-    while (cur && copied < len) {
-        size_t available = cur->len - start;
-        size_t to_copy = (len - copied < available) ? len - copied : available;
-
-        struct node* new_node = malloc(sizeof(struct node));
-        new_node->data = cur->data + start;
-        new_node->len = to_copy;
-        new_node->is_shared = true;
-        new_node->parent = cur;
-        new_node->ref_count = 0;
-        cur->ref_count++;
-        new_node->next = NULL;
-
-        if (!insert_head) insert_head = insert_tail = new_node;
-        else {
-            insert_tail->next = new_node;
-            insert_tail = new_node;
-        }
-        copied += to_copy;
-        cur = cur->next;
-        start = 0;
-    }
-
-    struct node* prev = NULL, *curr = dest->head;
-    size_t pos = 0;
-    while (curr && pos + curr->len <= destpos) {
-        pos += curr->len;
-        prev = curr;
-        curr = curr->next;
-    }
-
-    if (!curr || pos == destpos) {
-        insert_tail->next = curr;
-        if (prev) prev->next = insert_head;
-        else dest->head = insert_head;
-    } else {
-        size_t split = destpos - pos;
-        struct node* left = malloc(sizeof(struct node));
-        left->data = malloc(split * sizeof(int16_t));
-        memcpy(left->data, curr->data, split * sizeof(int16_t));
-        left->len = split;
-        left->is_shared = curr->is_shared;
-        left->parent = curr->parent;
-        left->ref_count = 0;
-
-        struct node* right = malloc(sizeof(struct node));
-        right->data = malloc((curr->len - split) * sizeof(int16_t));
-        memcpy(right->data, curr->data + split, (curr->len - split) * sizeof(int16_t));
-        right->len = curr->len - split;
-        right->is_shared = curr->is_shared;
-        right->parent = curr->parent;
-        right->ref_count = 0;
-        right->next = curr->next;
-
-        left->next = insert_head;
-        insert_tail->next = right;
-
-        if (prev) prev->next = left;
-        else dest->head = left;
-
-        if (curr->is_shared && curr->parent) curr->parent->ref_count--;
-        free(curr->data);
-        free(curr);
-    }
-    dest->total_len += len;
+    // Update references (if any overlap, they remain valid as data pointer is shared)
 }
 
 bool tr_delete_range(struct sound_seg* track, size_t pos, size_t len) {
     if (!track || pos + len > track->total_len) return false;
-    struct node* prev = NULL;
-    struct node* current = track->head;
-    size_t offset = 0;
 
-    while (current && offset + current->len <= pos) {
-        offset += current->len;
-        prev = current;
-        current = current->next;
+    // Check if any segment in range is a parent with children
+    for (size_t i = 0; i < track->ref_count; i++) {
+        if (track->refs[i].parent == NULL) { // This is a parent
+            size_t ref_end = track->refs[i].start + track->refs[i].len;
+            if (track->refs[i].ref_count > 0 &&
+                pos < ref_end && pos + len > track->refs[i].start) {
+                return false; // Cannot delete a parent with children
+            }
+        }
     }
 
-    if (!current) return false;
-
-    if (current->ref_count > 0) return false; // Cannot delete if it has children
-
-    if (offset == pos && current->len == len) {
-        if (prev) prev->next = current->next;
-        else track->head = current->next;
-        if (!current->is_shared || current->ref_count == 0) free(current->data);
-        free(current);
-        track->total_len -= len;
-        return true;
-    }
-
-    size_t start = pos - offset;
-    if (start > 0) {
-        struct node* left = malloc(sizeof(struct node));
-        left->data = malloc(start * sizeof(int16_t));
-        memcpy(left->data, current->data, start * sizeof(int16_t));
-        left->len = start;
-        left->is_shared = current->is_shared;
-        left->parent = current->parent;
-        left->ref_count = 0;
-        left->next = NULL;
-
-        size_t remaining = current->len - start - len;
-        if (remaining > 0) {
-            struct node* right = malloc(sizeof(struct node));
-            right->data = malloc(remaining * sizeof(int16_t));
-            memcpy(right->data, current->data + start + len, remaining * sizeof(int16_t));
-            right->len = remaining;
-            right->is_shared = current->is_shared;
-            right->parent = current->parent;
-            right->ref_count = 0;
-            right->next = current->next;
-            left->next = right;
-        } else {
-            left->next = current->next;
-        }
-
-        if (prev) prev->next = left;
-        else track->head = left;
-        if (current->is_shared && current->parent) current->parent->ref_count--;
-        free(current->data);
-        free(current);
-    } else {
-        size_t end = start + len;
-        if (end < current->len) {
-            struct node* right = malloc(sizeof(struct node));
-            right->data = malloc((current->len - end) * sizeof(int16_t));
-            memcpy(right->data, current->data + end, (current->len - end) * sizeof(int16_t));
-            right->len = current->len - end;
-            right->is_shared = current->is_shared;
-            right->parent = current->parent;
-            right->ref_count = 0;
-            right->next = current->next;
-
-            current->len = start;
-            current->next = right;
-        } else {
-            if (prev) prev->next = current->next;
-            else track->head = current->next;
-            if (!current->is_shared || current->ref_count == 0) free(current->data);
-            free(current);
-        }
+    // Shift data after the deleted range
+    size_t remaining = track->total_len - (pos + len);
+    if (remaining > 0) {
+        memmove(track->data + pos, track->data + pos + len, remaining * sizeof(int16_t));
     }
     track->total_len -= len;
+
+    // Update references
+    for (size_t i = 0; i < track->ref_count; i++) {
+        size_t ref_end = track->refs[i].start + track->refs[i].len;
+        if (pos < ref_end && pos + len > track->refs[i].start) {
+            // Overlaps with deleted range
+            if (pos <= track->refs[i].start && pos + len >= ref_end) {
+                // Entire reference deleted
+                if (track->refs[i].parent) track->refs[i].parent->refs[0].ref_count--; // Assuming single ref in parent
+                memmove(&track->refs[i], &track->refs[i + 1], (track->ref_count - i - 1) * sizeof(struct ref));
+                track->ref_count--;
+                i--;
+            } else if (pos > track->refs[i].start) {
+                track->refs[i].len = pos - track->refs[i].start;
+            } else {
+                size_t shift = pos + len - track->refs[i].start;
+                track->refs[i].start = pos;
+                track->refs[i].len -= shift;
+            }
+        } else if (track->refs[i].start >= pos + len) {
+            track->refs[i].start -= len;
+        }
+    }
     return true;
 }
 
@@ -344,7 +174,6 @@ char* tr_identify(const struct sound_seg* target, const struct sound_seg* ad) {
     tr_read((struct sound_seg*)target, target_data, 0, target_len);
     tr_read((struct sound_seg*)ad, ad_data, 0, ad_len);
 
-    // Compute autocorrelation of ad at zero delay (reference)
     double auto_corr = 0;
     for (size_t i = 0; i < ad_len; i++) {
         auto_corr += (double)ad_data[i] * ad_data[i];
@@ -371,12 +200,72 @@ char* tr_identify(const struct sound_seg* target, const struct sound_seg* ad) {
 
     free(target_data);
     free(ad_data);
-    if (result_len > 1) result[result_len - 1] = '\0'; // Remove trailing newline
+    if (result_len > 1) result[result_len - 1] = '\0';
     return result;
 }
 
+void tr_insert(struct sound_seg* src_track, struct sound_seg* dest_track,
+              size_t destpos, size_t srcpos, size_t len) {
+    if (!src_track || !dest_track || srcpos + len > src_track->total_len) return;
 
+    // Resize dest_track if necessary
+    size_t new_len = destpos + len + (dest_track->total_len > destpos ? dest_track->total_len - destpos : 0);
+    if (new_len > dest_track->capacity) {
+        size_t new_capacity = dest_track->capacity ? dest_track->capacity * 2 : 16;
+        while (new_capacity < new_len) new_capacity *= 2;
+        int16_t* new_data = realloc(dest_track->data, new_capacity * sizeof(int16_t));
+        if (!new_data) return;
+        dest_track->data = new_data;
+        dest_track->capacity = new_capacity;
+    }
 
-int main(void) {
+    // Shift existing data to make room
+    if (destpos < dest_track->total_len) {
+        memmove(dest_track->data + destpos + len, dest_track->data + destpos,
+                (dest_track->total_len - destpos) * sizeof(int16_t));
+    }
 
+    // Copy data from source (shared reference)
+    memcpy(dest_track->data + destpos, src_track->data + srcpos, len * sizeof(int16_t));
+    dest_track->total_len = new_len;
+
+    // Add reference to dest_track
+    if (dest_track->ref_count >= dest_track->ref_capacity) {
+        dest_track->ref_capacity = dest_track->ref_capacity ? dest_track->ref_capacity * 2 : 4;
+        struct ref* new_refs = realloc(dest_track->refs, dest_track->ref_capacity * sizeof(struct ref));
+        if (!new_refs) return;
+        dest_track->refs = new_refs;
+    }
+    dest_track->refs[dest_track->ref_count].start = destpos;
+    dest_track->refs[dest_track->ref_count].len = len;
+    dest_track->refs[dest_track->ref_count].parent = src_track;
+    dest_track->refs[dest_track->ref_count].ref_count = 0;
+    dest_track->ref_count++;
+
+    // Add parent reference to src_track if not already present
+    bool found = false;
+    for (size_t i = 0; i < src_track->ref_count; i++) {
+        if (src_track->refs[i].start == srcpos && src_track->refs[i].len == len && src_track->refs[i].parent == NULL) {
+            src_track->refs[i].ref_count++;
+            found = true;
+            break;
+        }
+    }
+    if (!found) {
+        if (src_track->ref_count >= src_track->ref_capacity) {
+            src_track->ref_capacity = src_track->ref_capacity ? src_track->ref_capacity * 2 : 4;
+            struct ref* new_refs = realloc(src_track->refs, src_track->ref_capacity * sizeof(struct ref));
+            if (!new_refs) return;
+            src_track->refs = new_refs;
+        }
+        src_track->refs[src_track->ref_count].start = srcpos;
+        src_track->refs[src_track->ref_count].len = len;
+        src_track->refs[src_track->ref_count].parent = NULL;
+        src_track->refs[src_track->ref_count].ref_count = 1;
+        src_track->ref_count++;
+    }
+}
+
+int main (void) {
+    return 0;
 }
