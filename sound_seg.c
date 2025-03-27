@@ -337,7 +337,6 @@ void tr_insert(struct sound_seg* src_track, struct sound_seg* dest_track,
     // }
     insert_head = NULL;
     insert_tail = NULL;
-
     struct sound_seg_node* src_temp = src_current;
     for (size_t j = 0; j < len && src_temp; j++) {
         struct sound_seg_node* new_node = malloc(sizeof(struct sound_seg_node));
