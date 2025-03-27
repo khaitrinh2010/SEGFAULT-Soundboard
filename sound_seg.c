@@ -124,8 +124,9 @@ void tr_write(struct sound_seg* track, const int16_t* src, size_t pos, size_t le
 
     if (!track->head) {
         struct node* new_node = malloc(sizeof(struct node));
-        new_node->data = malloc(len * sizeof(int16_t));
-        memcpy(new_node->data, src, len * sizeof(int16_t));
+        new_node->data = malloc((pos  + len) * sizeof(int16_t));
+        for (size_t i = 0; i < pos; i++) new_node->data[i] = 0;
+        memcpy(new_node->data + pos, src, len * sizeof(int16_t));
         new_node->len = len;
         new_node->is_shared = false;
         new_node->parent = NULL;
