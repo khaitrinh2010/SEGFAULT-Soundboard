@@ -203,15 +203,12 @@ bool tr_delete_range(struct sound_seg* track, size_t pos, size_t len) {
     struct sound_seg_node* current = track->head;
     struct sound_seg_node* prev = NULL;
     size_t i = 0;
-
     while (current && i < pos) {
         prev = current;
         current = current->next;
         i++;
     }
     if (!current) return false;
-
-    // Check if any parent nodes in range have references
     struct sound_seg_node* check = current;
     for (size_t j = 0; j < len && check; j++) {
         if (check->isParent && check->A.parent_data.refCount > 0) {
@@ -219,8 +216,6 @@ bool tr_delete_range(struct sound_seg* track, size_t pos, size_t len) {
         }
         check = check->next;
     }
-
-    // Delete nodes and update refCount for child nodes
     for (size_t j = 0; j < len && current; j++) {
         struct sound_seg_node* next = current->next;
         if (!current->isParent && current->A.child_data.parent) {
