@@ -4,11 +4,8 @@
 #include <stdbool.h>
 #include <string.h>
 #include <stdio.h>
-
-//NOTE: Buffer is int16
 #define OFFSET 40
 #define OFFSET_TO_AUDIO_DATA 44
-
 //SIGNAL 11: occurs when program attempts to access memory it does not have permission to access
 #pragma pack(push, 1)
 struct sound_seg_node {
@@ -293,7 +290,6 @@ char* tr_identify(struct sound_seg* target, struct sound_seg* ad) {
     if (used > 0 && result[used - 1] == '\n') result[used - 1] = '\0';
     return result;
 }
-
 void tr_insert(struct sound_seg* src_track, struct sound_seg* dest_track,
                size_t destpos, size_t srcpos, size_t len) {
     if (!src_track || !dest_track || len == 0 || srcpos + len > tr_length(src_track)) return;
