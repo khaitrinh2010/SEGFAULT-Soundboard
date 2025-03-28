@@ -1,10 +1,14 @@
 #include <stdint.h>
+#include <stddef.h>
 #include <stdlib.h>
 #include <stdbool.h>
 #include <string.h>
 #include <stdio.h>
+
+//NOTE: Buffer is int16
 #define OFFSET 40
 #define OFFSET_TO_AUDIO_DATA 44
+
 //SIGNAL 11: occurs when program attempts to access memory it does not have permission to access
 #pragma pack(push, 1)
 struct sound_seg_node {
@@ -30,6 +34,8 @@ struct sound_seg_node* parent_node = NULL;
 struct sound_seg_node* insert_head = NULL;
 struct sound_seg_node* insert_tail = NULL;
 #pragma pack(pop)
+
+
 // Load a WAV file into buffer
 void wav_load(const char* filename, int16_t* dest){  //wav file header is discarded
     FILE *file;
@@ -255,6 +261,7 @@ char* tr_identify(struct sound_seg* target, struct sound_seg* ad) {
     size_t capacity = 256;
     size_t used = 0;
     result[0] = '\0';
+
     for (size_t i = 0; i <= target_len - ad_len; i++) {
         double corr = compute_cross_correlation(target_data + i, ad_data, ad_len);
         if (corr >= 0.95) {
@@ -272,7 +279,6 @@ char* tr_identify(struct sound_seg* target, struct sound_seg* ad) {
                 }
                 result = new_result;
             }
-
             strcpy(result + used, temp);
             used += len;
             i += ad_len - 1;
@@ -287,6 +293,7 @@ char* tr_identify(struct sound_seg* target, struct sound_seg* ad) {
     if (used > 0 && result[used - 1] == '\n') result[used - 1] = '\0';
     return result;
 }
+
 void tr_insert(struct sound_seg* src_track, struct sound_seg* dest_track,
                size_t destpos, size_t srcpos, size_t len) {
     if (!src_track || !dest_track || len == 0 || srcpos + len > tr_length(src_track)) return;
