@@ -117,7 +117,7 @@ bool tr_delete_range(struct sound_seg* track, size_t pos, size_t len) {
             node->A.child_data.parent->A.parent_data.refCount--;
         }
         free(node);
-        track->nodes[i] = NULL;
+        //track->nodes[i] = NULL;
     }
     if (end < track->length) {
         for (size_t i = pos; i < track->length - (end - pos); i++) {
@@ -139,10 +139,10 @@ void tr_insert(struct sound_seg* src_track, struct sound_seg* dest_track, size_t
         memmove(&dest_track->nodes[destpos + len], &dest_track->nodes[destpos],
                 (dest_track->length - destpos) * sizeof(struct sound_seg_node*));
     }
-    size_t offset = (src_track == dest_track) ? len : 0; // Only offset if inserting after srcpos
+    size_t offset = (src_track == dest_track) ? len : 0;
     for (size_t i = 0; i < len; i++) {
         size_t src_idx = srcpos + i + offset;
-        if (src_idx >= src_track->length) return; // Bounds check
+        if (src_idx >= src_track->length) return;
         struct sound_seg_node* src_node = src_track->nodes[src_idx];
         struct sound_seg_node* parent = src_node;
         while (!parent->isParent && parent->A.child_data.parent) {
