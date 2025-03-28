@@ -56,7 +56,6 @@ void tr_resize(struct sound_seg* track, size_t new_capacity) {
     struct sound_seg_node** new_nodes = realloc(track->nodes, new_capacity * sizeof(struct sound_seg_node*));
     if (!new_nodes) return;
     track->nodes = new_nodes;
-    // Initialize new nodes
     for (size_t i = track->capacity; i < new_capacity; i++) {
         track->nodes[i] = malloc(sizeof(struct sound_seg_node));
         if (!track->nodes[i]) return; // Handle allocation failure
@@ -127,7 +126,6 @@ bool tr_delete_range(struct sound_seg* track, size_t pos, size_t len) {
     track->length -= end - pos;
     return true;
 }
-
 void tr_insert(struct sound_seg* src_track, struct sound_seg* dest_track, size_t destpos, size_t srcpos, size_t len) {
     if (!src_track || !dest_track || srcpos + len > src_track->length || len == 0) return;
     size_t new_length = dest_track->length + len;
@@ -138,9 +136,11 @@ void tr_insert(struct sound_seg* src_track, struct sound_seg* dest_track, size_t
         memmove(&dest_track->nodes[destpos + len], &dest_track->nodes[destpos],
                 (dest_track->length - destpos) * sizeof(struct sound_seg_node*));
     }
-    size_t offset = (src_track == dest_track) ? len : 0;
+    size_t offset = (src_track == dest_track && srcpos >= destpos) ? len : 0; // Only offset if inserting after srcpos
     for (size_t i = 0; i < len; i++) {
-        struct sound_seg_node* src_node = src_track->nodes[srcpos + i + offset];
+        size_t src_idx = srcpos + i + offset;
+        if (src_idx >= src_track->length) return; // Bounds check
+        struct sound_seg_node* src_node = src_track->nodes[src_idx];
         struct sound_seg_node* parent = src_node;
         while (!parent->isParent && parent->A.child_data.parent) {
             parent = parent->A.child_data.parent;
