@@ -84,7 +84,7 @@ void tr_write(struct sound_seg* track, const int16_t* src, size_t pos, size_t le
     }
     if (new_length > track->length) {
         for (size_t i = track->length; i < new_length; i++) {
-            track->nodes[i] = malloc(sizeof(struct sound_seg_node));
+            track->nodes[i] = malloc(sizeof(struct sound_seg_node)); ///needs to be freed later
             if (!track->nodes[i]) return;
             track->nodes[i]->A.parent_data.sample = 0;
             track->nodes[i]->A.parent_data.refCount = 0;
@@ -121,12 +121,14 @@ bool tr_delete_range(struct sound_seg* track, size_t pos, size_t len) {
     }
     if (end < track->length) {
         for (size_t i = pos; i < track->length - (end - pos); i++) {
-            track->nodes[i] = track->nodes[i + (end - pos)]; // Shift pointers
+            track->nodes[i] = track->nodes[i + (end - pos)];
         }
     }
     track->length -= end - pos;
     return true;
 }
+
+
 void tr_insert(struct sound_seg* src_track, struct sound_seg* dest_track, size_t destpos, size_t srcpos, size_t len) {
     if (!src_track || !dest_track || srcpos + len > src_track->length || len == 0) return;
     size_t new_length = dest_track->length + len;
@@ -137,7 +139,7 @@ void tr_insert(struct sound_seg* src_track, struct sound_seg* dest_track, size_t
         memmove(&dest_track->nodes[destpos + len], &dest_track->nodes[destpos],
                 (dest_track->length - destpos) * sizeof(struct sound_seg_node*));
     }
-    size_t offset = (src_track == dest_track && srcpos >= destpos) ? len : 0; // Only offset if inserting after srcpos
+    size_t offset = (src_track == dest_track) ? len : 0; // Only offset if inserting after srcpos
     for (size_t i = 0; i < len; i++) {
         size_t src_idx = srcpos + i + offset;
         if (src_idx >= src_track->length) return; // Bounds check
