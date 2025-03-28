@@ -48,7 +48,6 @@ void wav_load(const char* filename, int16_t* dest){  //wav file header is discar
     fseek(file, OFFSET, SEEK_SET); // Extract how many bytes in the data audio
     uint32_t number_of_bytes;
     fread(&number_of_bytes, sizeof(uint32_t), 1, file); //read how many number_of_bytes excluding the sample I should read
-
     fseek(file, OFFSET_TO_AUDIO_DATA, SEEK_SET);
     fread(dest, sizeof(int16_t), number_of_bytes / sizeof(int16_t), file); //Read the data and write to the stream
     fclose(file);
@@ -285,7 +284,6 @@ char* tr_identify(struct sound_seg* target, struct sound_seg* ad) {
             i += ad_len - 1;
         }
     }
-
     free(target_data);
     free(ad_data);
     if (used == 0) {
@@ -306,8 +304,6 @@ void tr_insert(struct sound_seg* src_track, struct sound_seg* dest_track,
         i++;
     }
     if (!src_current) return;
-
-    size_t dest_len = tr_length(dest_track);
     struct sound_seg_node* dest_current = dest_track->head;
     struct sound_seg_node* dest_prev = NULL;
     i = 0;
@@ -316,20 +312,6 @@ void tr_insert(struct sound_seg* src_track, struct sound_seg* dest_track,
         dest_current = dest_current->next;
         i++;
     }
-
-    // // Pad destination track if destpos > current length
-    // while (i < destpos) {
-    //     struct sound_seg_node* new_node = malloc(sizeof(struct sound_seg_node));
-    //     if (!new_node) return;
-    //     new_node->A.parent_data.sample = 0;
-    //     new_node->A.parent_data.refCount = 0;
-    //     new_node->next = NULL;
-    //     new_node->isParent = true;
-    //     if (dest_prev) dest_prev->next = new_node;
-    //     else dest_track->head = new_node;
-    //     dest_prev = new_node;
-    //     i++;
-    // }
     insert_head = NULL;
     insert_tail = NULL;
     struct sound_seg_node* src_temp = src_current;
@@ -359,8 +341,6 @@ void tr_insert(struct sound_seg* src_track, struct sound_seg* dest_track,
         else dest_track->head = insert_head;
     }
 }
-
-
 int main(int argc, char** argv) {
     struct sound_seg* s0 = tr_init();
     tr_write(s0, ((int16_t[]){}), 0, 0);
