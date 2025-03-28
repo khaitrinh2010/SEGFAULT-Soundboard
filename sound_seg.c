@@ -58,7 +58,7 @@ void tr_resize(struct sound_seg* track, size_t new_capacity) {
     track->nodes = new_nodes;
     for (size_t i = track->capacity; i < new_capacity; i++) {
         track->nodes[i] = malloc(sizeof(struct sound_seg_node));
-        if (!track->nodes[i]) return; // Handle allocation failure
+        if (!track->nodes[i]) return;
         track->nodes[i]->A.parent_data.sample = 0;
         track->nodes[i]->A.parent_data.refCount = 0;
         track->nodes[i]->isParent = true;
