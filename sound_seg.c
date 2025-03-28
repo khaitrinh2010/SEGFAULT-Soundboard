@@ -272,6 +272,7 @@ char* tr_identify(struct sound_seg* target, struct sound_seg* ad) {
                 }
                 result = new_result;
             }
+
             strcpy(result + used, temp);
             used += len;
             i += ad_len - 1;
