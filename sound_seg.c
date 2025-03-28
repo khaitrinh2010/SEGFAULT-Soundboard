@@ -41,9 +41,9 @@ struct sound_seg* tr_init(void) {
 void tr_destroy(struct sound_seg* track) {
     if (!track) return;
     for (size_t i = 0; i < track->length; i++) {
-        free(track->nodes[i]); // Free each node
+        free(track->nodes[i]);
     }
-    free(track->nodes); // Free the pointer array
+    free(track->nodes);
     free(track);
 }
 
@@ -116,7 +116,8 @@ bool tr_delete_range(struct sound_seg* track, size_t pos, size_t len) {
         if (!node->isParent && node->A.child_data.parent) {
             node->A.child_data.parent->A.parent_data.refCount--;
         }
-        free(node); // Free the deleted node
+        free(node);
+        track->nodes[i] = NULL;
     }
     if (end < track->length) {
         for (size_t i = pos; i < track->length - (end - pos); i++) {
