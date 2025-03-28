@@ -40,8 +40,8 @@ struct sound_seg* tr_init(void) {
 
 void tr_destroy(struct sound_seg* track) {
     if (!track) return;
-    for (size_t i = 0; i < track->length; i++) {
-        free(track->nodes[i]);
+    for (size_t i = 0; i < track->capacity; i++) {
+        if (track->nodes[i]) free(track->nodes[i]);
     }
     free(track->nodes);
     free(track);
