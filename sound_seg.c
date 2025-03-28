@@ -334,13 +334,13 @@ void tr_insert(struct sound_seg* src_track, struct sound_seg* dest_track,
         }
         src_temp = src_temp->next;
     }
-
     if (insert_head) {
         insert_tail->next = dest_current;
         if (dest_prev) dest_prev->next = insert_head;
         else dest_track->head = insert_head;
     }
 }
+
 int main(int argc, char** argv) {
     struct sound_seg* s0 = tr_init();
     tr_write(s0, ((int16_t[]){}), 0, 0);
