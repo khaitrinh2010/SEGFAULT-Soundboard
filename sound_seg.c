@@ -101,18 +101,21 @@ bool tr_delete_range(struct sound_seg* track, size_t pos, size_t len) {
     if (!track || pos >= track->length || len == 0) return false;
     size_t end = pos + len > track->length ? track->length : pos + len;
     for (size_t i = pos; i < end; i++) {
-        if (track->nodes[i].isParent && track->nodes[i].A.parent_data.refCount > 0) {
-            return false;
-        }
-    }
-    for (size_t i = pos; i < end; i++) {
-        if (!track->nodes[i].isParent && track->nodes[i].A.child_data.parent) {
-            track->nodes[i].A.child_data.parent->A.parent_data.refCount--;
+        struct sound_seg_node* node = &track->nodes[i];
+        if (node->isParent) {
+            if (node->A.parent_data.refCount > 0) {
+                return false;
+            }
+        } else if (node->A.child_data.parent) {
+            node->A.child_data.parent->A.parent_data.refCount--;
         }
     }
     if (end < track->length) {
-        memmove(&track->nodes[pos], &track->nodes[end], (track->length - end) * sizeof(struct sound_seg_node));
+        for (size_t i = pos; i < track->length - (end - pos); i++) {
+            track->nodes[i] = track->nodes[i + (end - pos)];
+        }
     }
+
     track->length -= end - pos;
     return true;
 }
@@ -297,37 +300,51 @@ void print_track(struct sound_seg* track) {
 
 int main(int argc, char** argv) {
     //SEED=3311700813
+    //SEED=3020626455
     struct sound_seg* s0 = tr_init();
-    tr_write(s0, ((int16_t[]){12,-20,12,10,-11}), 0, 5);
+    tr_write(s0, ((int16_t[]){1,9}), 0, 2);
     struct sound_seg* s1 = tr_init();
-    tr_write(s1, ((int16_t[]){13,16,-8,-19,-11,-2,-2,-8,-11,20,5}), 0, 11);
+    tr_write(s1, ((int16_t[]){0,8,1,15}), 0, 4);
     struct sound_seg* s2 = tr_init();
-    tr_write(s2, ((int16_t[]){-10,-9,8,-18,12,9,-11}), 0, 7);
+    tr_write(s2, ((int16_t[]){-19,1,1,-12,-3,-13,18,-16,-5,-19,-18,14,-12,-4,19,17,-17,16,-20,4}), 0, 20);
     struct sound_seg* s3 = tr_init();
-    tr_write(s3, ((int16_t[]){14,14,13,-14,10,20}), 0, 6);
-    tr_insert(s2, s1, 8, 3, 1);
-    print_track(s1);
-    tr_write(s3, ((int16_t[]){4,-13,-12,20,-5,-17}), 0, 6);
-    tr_write(s0, ((int16_t[]){16,10,-3,-13,-13}), 0, 5);
-    tr_insert(s1, s0, 1, 1, 5);
-    tr_write(s0, ((int16_t[]){10,-11,16,-10,18,-14,-7,-4,17,8}), 0, 10);
-    tr_write(s2, ((int16_t[]){-7,-10,11,-18,16,-14,-13}), 0, 7);
-    tr_write(s1, ((int16_t[]){5,-3,-16,15,-3,3,11,8,10,20,-10,-4}), 0, 12);
-    tr_insert(s3, s3, 4, 5, 1);
-    tr_write(s1, ((int16_t[]){-13,-19,-4,-18,7,12,-13,-6,-19,-1,12,15}), 0, 12);
-    tr_write(s2, ((int16_t[]){14,18,12,-1,17,11,19}), 0, 7);
-    tr_write(s3, ((int16_t[]){14,-6,5,19,6,15,14}), 0, 7);
-    tr_write(s0, ((int16_t[]){-6,13,-19,18,1,17,-14,-12,3,5}), 0, 10);
-    tr_delete_range(s2, 4, 2); //expect return True
-    int16_t FAILING_READ[7];
-    tr_read(s3, FAILING_READ, 0, 7);
-    //expected [14 -6  5 19 14 15 14], actual [14 -6  5 19 15 15 14]!
-    for (int i = 0; i < 7; i++) {
-        printf("FAILING_READ[%d] = %d\n", i, FAILING_READ[i]);
+    tr_write(s3, ((int16_t[]){16,5}), 0, 2);
+    struct sound_seg* s4 = tr_init();
+    tr_write(s4, ((int16_t[]){}), 0, 0);
+    tr_insert(s2, s3, 1, 18, 2);
+    tr_write(s2, ((int16_t[]){-5,16,17,-8,-4,16,16,16,12,-3,16,12,18,16,8,-8,-12,10,16,16}), 0, 20);
+    tr_write(s0, ((int16_t[]){0,-6,15}), 0, 3);
+    tr_delete_range(s0, 1, 1); //expect return True
+    tr_write(s3, ((int16_t[]){11,5,5,-2}), 0, 4);
+    tr_delete_range(s1, 1, 1); //expect return True
+    tr_write(s4, ((int16_t[]){10,10}), 0, 2);
+    tr_delete_range(s4, 0, 1); //expect return True
+    tr_write(s2, ((int16_t[]){-16,1,-2,19,0,14,6,-14,-7,0,-2,-11,-13,5,-2,2,-18,-2,-2,16}), 0, 20);
+    tr_delete_range(s1, 1, 1); //expect return True
+    tr_write(s3, ((int16_t[]){27,-27}), 1, 2);
+    print_track(s2);
+    printf("\n");
+    print_track(s3);
+    tr_delete_range(s2, 5, 6); //expect return True
+    // tr_write(s2, ((int16_t[]){-21,21}), 12, 2);
+    // print_track(s2);
+    // printf("\n");
+    // print_track(s3);
+
+    tr_write(s1, ((int16_t[]){16,3,-16,-16,20}), 0, 5);
+    tr_write(s2, ((int16_t[]){-21,21}), 12, 2);
+
+    tr_write(s3, ((int16_t[]){15}), 0, 1);
+    tr_write(s3, ((int16_t[]){4,-19,-19,6,1}), 0, 5);
+    int16_t FAILING_READ[14];
+    tr_read(s2, FAILING_READ, 0, 14);
+    for (size_t i = 0; i < 14; i++) {
+        printf("%d ", FAILING_READ[i]);
     }
-    tr_read(s3, FAILING_READ, 0, 7);
+    //expected [-16   1  -2  19   0 -11 -13   5  -2   2 -18  -2 -19 -19], actual [-16   1  -2  19   0 -11 -13   5  -2   2 -18  -2  -2  16]!
     tr_destroy(s0);
     tr_destroy(s1);
     tr_destroy(s2);
     tr_destroy(s3);
+    tr_destroy(s4);
 }
