@@ -117,7 +117,7 @@ bool tr_delete_range(struct sound_seg* track, size_t pos, size_t len) {
             node->A.child_data.parent->A.parent_data.refCount--;
         }
         free(node);
-        //track->nodes[i] = NULL;
+        track->nodes[i] = NULL;
     }
     if (end < track->length) {
         for (size_t i = pos; i < track->length - (end - pos); i++) {
