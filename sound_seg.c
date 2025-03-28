@@ -255,7 +255,6 @@ char* tr_identify(struct sound_seg* target, struct sound_seg* ad) {
     size_t capacity = 256;
     size_t used = 0;
     result[0] = '\0';
-
     for (size_t i = 0; i <= target_len - ad_len; i++) {
         double corr = compute_cross_correlation(target_data + i, ad_data, ad_len);
         if (corr >= 0.95) {
