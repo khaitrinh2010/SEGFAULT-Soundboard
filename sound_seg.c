@@ -736,6 +736,7 @@ void print_track_metadata(struct sound_seg* track, const char* track_name) {
         printf("\n");
         index++;
     }
+
     printf("  ]\n");
     printf("}\n");
 }
