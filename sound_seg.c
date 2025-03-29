@@ -34,8 +34,6 @@ struct sound_seg_node* parent_node = NULL;
 struct sound_seg_node* insert_head = NULL;
 struct sound_seg_node* insert_tail = NULL;
 #pragma pack(pop)
-
-
 // Load a WAV file into buffer
 void wav_load(const char* filename, int16_t* dest){  //wav file header is discarded
     FILE *file;
