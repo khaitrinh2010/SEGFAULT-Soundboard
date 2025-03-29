@@ -30,6 +30,7 @@ struct sound_seg_node {
 struct sound_seg {
     struct sound_seg_node* head;
 };
+
 struct sound_seg_node* parent_node = NULL;
 struct sound_seg_node* insert_head = NULL;
 struct sound_seg_node* insert_tail = NULL;
@@ -42,7 +43,6 @@ void wav_load(const char* filename, int16_t* dest){  //wav file header is discar
       printf("Error opening file\n");
       return;
     }
-    //WAV File: RIFF header, FMT sub-chunk, DATA sub-chunk
     fseek(file, OFFSET, SEEK_SET); // Extract how many bytes in the data audio
     uint32_t number_of_bytes;
     fread(&number_of_bytes, sizeof(uint32_t), 1, file); //read how many number_of_bytes excluding the sample I should read
@@ -58,15 +58,11 @@ void wav_save(const char* fname, int16_t* src, size_t len) {
         printf("Error opening file\n");
         return;
     }
-
-    // Define a union for the WAV header
     union wav_header {
         struct {
-            // RIFF chunk
             char riff[4];
             uint32_t flength;
             char wave[4];
-            // fmt sub-chunk
             char fmt[4];
             int32_t chunk_size;
             int16_t format_tag;
@@ -75,13 +71,11 @@ void wav_save(const char* fname, int16_t* src, size_t len) {
             int32_t bytes_per_sec;
             int16_t bytes_per_sample;
             int16_t bits_per_sample;
-            // data sub-chunk
             char data[4];
             int32_t dlength;
         } fields;
         char bytes[OFFSET_TO_AUDIO_DATA];
     } header;
-
     memcpy(header.fields.riff, "RIFF", 4);
     header.fields.flength = len * sizeof(int16_t) + OFFSET_TO_AUDIO_DATA;
     memcpy(header.fields.wave, "WAVE", 4);
@@ -95,11 +89,8 @@ void wav_save(const char* fname, int16_t* src, size_t len) {
     header.fields.bits_per_sample = 16;
     memcpy(header.fields.data, "data", 4);
     header.fields.dlength = len * sizeof(int16_t);
-
     fwrite(&header, sizeof(header), 1, file);
-
     fwrite(src, sizeof(int16_t), len, file);
-
     fclose(file);
 }
 
@@ -121,7 +112,6 @@ void tr_destroy(struct sound_seg* track) {
     free(track);
 }
 
-// Return the total number of samples in the track
 size_t tr_length(struct sound_seg* track) {
     size_t length = 0;
     struct sound_seg_node* current = track->head;
