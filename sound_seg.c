@@ -180,7 +180,9 @@ bool tr_delete_range(struct sound_seg* track, size_t pos, size_t len) {
         }
     }
 
-    memmove(&track->nodes[pos], &track->nodes[end], (track->length - end) * sizeof(struct sound_seg_node));
+    for (size_t i = pos; i < track->length - (end - pos); i++) {
+        track->nodes[i] = track->nodes[i + (end - pos)];
+    }
     track->length -= (end - pos);
     for (size_t i = pos; i < track->length; i++) {
         if (track->nodes[i].parent_id >= end) track->nodes[i].parent_id -= (end - pos);
@@ -261,26 +263,23 @@ void tr_insert(struct sound_seg* src_track, struct sound_seg* dest_track, size_t
     if (new_length > dest_track->capacity) {
         tr_resize(dest_track, new_length * 2 > dest_track->capacity ? new_length * 2 : dest_track->capacity + 1);
     }
-
-    memmove(&dest_track->nodes[destpos + len], &dest_track->nodes[destpos], (dest_track->length - destpos) * sizeof(struct sound_seg_node));
+    for (size_t i = dest_track->length; i > destpos; i--) {
+        dest_track->nodes[i + len - 1] = dest_track->nodes[i - 1];
+    }
     dest_track->length = new_length;
-
     for (size_t i = 0; i < len; i++) {
         uint16_t src_idx = srcpos + i;
         uint16_t dest_idx = destpos + i;
         uint16_t src_root = find_root(src_track->nodes, src_idx);
-
         dest_track->nodes[dest_idx].node_id = dest_track->next_node_id++;
         dest_track->nodes[dest_idx].parent_id = src_root;
         dest_track->nodes[dest_idx].cluster_id = src_track->nodes[src_root].cluster_id;
         dest_track->nodes[dest_idx].ref_count = 1;
         dest_track->nodes[dest_idx].sample = src_track->nodes[src_root].sample;
         dest_track->nodes[dest_idx].is_parent = false;
-
         src_track->nodes[src_root].ref_count++;
         src_track->nodes[src_root].is_parent = true;
     }
-
     for (size_t i = destpos + len; i < dest_track->length; i++) {
         if (dest_track->nodes[i].parent_id >= destpos) {
             dest_track->nodes[i].parent_id += len;
