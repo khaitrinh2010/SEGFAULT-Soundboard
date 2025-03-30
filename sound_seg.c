@@ -4,33 +4,30 @@
 #include <stdbool.h>
 #include <string.h>
 #include <stdio.h>
-
 #define OFFSET 40
 #define OFFSET_TO_AUDIO_DATA 44
-#define MAX_NODES 65535  // Max nodes based on uint16_t
-
+#define MAX_NODES 65535
 struct sound_seg_node* node_pool[MAX_NODES] = {0};
 uint16_t node_count = 0;
-
 #pragma pack(push, 1)
 struct sound_seg_node {
     union A {
         struct {
-            int refCount;    // 4 bytes
-            int16_t sample;  // 2 bytes
-        } parent_data;       // Total: 6 bytes
+            int refCount;
+            int16_t sample;
+        } parent_data;
         struct {
-            uint16_t parent_id;  // 2 bytes (replaces pointer)
-        } child_data;        // Total: 2 bytes
+            uint16_t parent_id;
+        } child_data;
     } A;
-    uint16_t next_id;        // 2 bytes
-    bool isParent;           // 1 byte
+    uint16_t next_id;
+    bool isParent;
     // Total size: 9 bytes (with padding, likely 12 bytes due to alignment)
 };
 #pragma pack(pop)
 
 struct sound_seg {
-    uint16_t head_id;        // 2 bytes
+    uint16_t head_id;
 };
 
 uint16_t alloc_node() {
@@ -189,7 +186,6 @@ void tr_write(struct sound_seg* track, const int16_t* src, size_t pos, size_t le
         current_id = current->next_id;
         i++;
     }
-
     while (i < pos) {
         uint16_t new_id = alloc_node();
         if (new_id == UINT16_MAX) return;
@@ -369,7 +365,7 @@ void tr_insert(struct sound_seg* src_track, struct sound_seg* dest_track,
         while (!parent_node->isParent && parent_node->A.child_data.parent_id != UINT16_MAX) {
             parent_node = get_node(parent_node->A.child_data.parent_id);
         }
-        new_node->A.child_data.parent_id = src_temp_id; // Link to original source node
+        new_node->A.child_data.parent_id = src_temp_id;
         new_node->next_id = UINT16_MAX;
         new_node->isParent = false;
         parent_node->A.parent_data.refCount++;
