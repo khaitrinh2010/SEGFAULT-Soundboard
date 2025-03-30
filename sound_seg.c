@@ -10,25 +10,26 @@
 struct sound_seg_node* node_pool[MAX_NODES] = {0};
 uint16_t node_count = 0;
 
+#pragma pack(push, 1)
 struct sound_seg_node {
     union A {
         struct {
-            uint8_t refCount;
-            int16_t sample;
+            uint8_t refCount; // When it is a parent, this is the number of portion that points directly to it
+            int16_t sample; //the data under the node
         } parent_data;
         struct {
-            uint16_t parent_id;
+            uint16_t parent_id; //When it is a child, this is the id of the parent node
         } child_data;
     } A;
-    uint16_t next_id;
-    bool isParent;
+    uint16_t next_id; // the id of the next node in the linked list
+    bool isParent; // true if the node is a parent, false if it is a child
 };
 
 
 struct sound_seg {
-    uint16_t head_id;
+    uint16_t head_id; // the id of the first node in the linked list
 };
-
+#pragma pack(pop)
 uint16_t alloc_node() {
     if (node_count >= MAX_NODES) return UINT16_MAX;
     struct sound_seg_node* node = malloc(sizeof(struct sound_seg_node));
