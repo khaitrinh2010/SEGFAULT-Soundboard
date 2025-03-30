@@ -330,6 +330,18 @@ void tr_insert(struct sound_seg* src_track, struct sound_seg* dest_track, size_t
         dest_track->nodes[i + len - 1] = dest_track->nodes[i - 1];
     }
     
+    // Allocate and initialize new nodes
+    for (size_t i = 0; i < len; i++) {
+        dest_track->nodes[destpos + i] = malloc(sizeof(struct sound_seg_node));
+        if (!dest_track->nodes[destpos + i]) {
+            // Handle allocation failure
+            for (size_t j = 0; j < i; j++) {
+                free(dest_track->nodes[destpos + j]);
+            }
+            return;
+        }
+    }
+    
     // Update length before copying nodes
     dest_track->length = new_length;
     
@@ -337,9 +349,7 @@ void tr_insert(struct sound_seg* src_track, struct sound_seg* dest_track, size_t
     for (size_t i = 0; i < len; i++) {
         uint16_t dest_idx = destpos + i;
         uint16_t src_idx;
-        
         if (src_track == dest_track) {
-            // For self-insertion, adjust source position based on whether we're inserting before or after the source
             if (destpos <= srcpos) {
                 src_idx = srcpos + i;
             } else {
