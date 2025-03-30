@@ -369,7 +369,7 @@ void tr_insert(struct sound_seg* src_track, struct sound_seg* dest_track, size_t
         parent->A.parent_data.refCount++;
         if (!insert_head) insert_head = insert_tail = new_node;
         else {
-            insert_tail->a = new_node;
+            insert_tail->next = new_node;
             insert_tail = new_node;
         }
         src_temp = src_temp->next;
