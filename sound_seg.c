@@ -26,23 +26,16 @@ struct sound_seg {
     size_t length;
     size_t capacity;
     uint16_t next_node_id;
-    struct sound_seg* next; // Linked list pointer to next track
+    struct sound_seg* next;
 };
 
-static struct sound_seg* all_tracks = NULL; // Global list of all tracks
+static struct sound_seg* all_tracks = NULL;
 
-static uint16_t find_root(struct sound_seg_node* nodes, uint16_t node_id) {
-    if (nodes[node_id].parent_id != node_id) {
-        nodes[node_id].parent_id = find_root(nodes, nodes[node_id].parent_id);
-    }
-    return nodes[node_id].parent_id;
-}
-
-static void update_cluster(uint16_t root_id, int16_t new_sample) {
+static void update_cluster(uint16_t cluster_id, int16_t new_sample) {
     struct sound_seg* track = all_tracks;
     while (track != NULL) {
         for (size_t i = 0; i < track->length; i++) {
-            if (find_root(track->nodes, i) == root_id) {
+            if (track->nodes[i].cluster_id == cluster_id) {
                 track->nodes[i].sample = new_sample;
             }
         }
@@ -111,7 +104,7 @@ struct sound_seg* tr_init(void) {
     track->length = 0;
     track->capacity = 0;
     track->next_node_id = 0;
-    track->next = all_tracks; // Add to global list
+    track->next = all_tracks;
     all_tracks = track;
     return track;
 }
@@ -159,8 +152,7 @@ void tr_read(struct sound_seg* track, int16_t* dest, size_t pos, size_t len) {
     if (!track || !dest || pos >= track->length || len == 0) return;
     size_t end = pos + len > track->length ? track->length : pos + len;
     for (size_t i = pos; i < end; i++) {
-        uint16_t root_id = find_root(track->nodes, i);
-        dest[i - pos] = track->nodes[root_id].sample;
+        dest[i - pos] = track->nodes[i].sample;
     }
 }
 
@@ -182,8 +174,8 @@ void tr_write(struct sound_seg* track, const int16_t* src, size_t pos, size_t le
         track->length = new_length;
     }
     for (size_t i = 0; i < len; i++) {
-        uint16_t root_id = find_root(track->nodes, pos + i);
-        update_cluster(root_id, src[i]);
+        uint16_t cluster_id = track->nodes[pos + i].cluster_id;
+        update_cluster(cluster_id, src[i]);
     }
 }
 
@@ -292,15 +284,15 @@ void tr_insert(struct sound_seg* src_track, struct sound_seg* dest_track, size_t
     for (size_t i = 0; i < len; i++) {
         uint16_t src_idx = srcpos + i;
         uint16_t dest_idx = destpos + i;
-        uint16_t src_root = find_root(src_track->nodes, src_idx);
+        uint16_t src_cluster_id = src_track->nodes[src_idx].cluster_id;
         dest_track->nodes[dest_idx].node_id = dest_track->next_node_id++;
-        dest_track->nodes[dest_idx].parent_id = src_root;
-        dest_track->nodes[dest_idx].cluster_id = src_track->nodes[src_root].cluster_id;
+        dest_track->nodes[dest_idx].parent_id = src_idx; // Still tracks direct parent
+        dest_track->nodes[dest_idx].cluster_id = src_cluster_id; // Merge by cluster_id
         dest_track->nodes[dest_idx].ref_count = 1;
-        dest_track->nodes[dest_idx].sample = src_track->nodes[src_root].sample;
+        dest_track->nodes[dest_idx].sample = src_track->nodes[src_idx].sample;
         dest_track->nodes[dest_idx].is_parent = false;
-        src_track->nodes[src_root].ref_count++;
-        src_track->nodes[src_root].is_parent = true;
+        src_track->nodes[src_idx].ref_count++;
+        src_track->nodes[src_idx].is_parent = true;
     }
     for (size_t i = destpos + len; i < dest_track->length; i++) {
         if (dest_track->nodes[i].parent_id >= destpos) {
