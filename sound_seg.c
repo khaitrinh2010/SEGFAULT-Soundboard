@@ -9,7 +9,6 @@
 #define OFFSET 40
 #define OFFSET_TO_AUDIO_DATA 44
 
-//SIGNAL 11: occurs when program attempts to access memory it does not have permission to access
 #pragma pack(push, 1)
 struct sound_seg_node {
     uint16_t node_id;
@@ -25,7 +24,7 @@ struct sound_seg {
     struct sound_seg_node* nodes;
     size_t length;
     size_t capacity;
-    uint16_t next_node_id;  // 2 bytes
+    uint16_t next_node_id;
 };
 
 static uint16_t find_root(struct sound_seg_node* nodes, uint16_t node_id) {
@@ -36,11 +35,8 @@ static uint16_t find_root(struct sound_seg_node* nodes, uint16_t node_id) {
     return node_id;
 }
 
-// Helper function to union two clusters
 static void union_clusters(struct sound_seg_node* nodes, uint16_t root1, uint16_t root2) {
     if (root1 == root2) return;
-    
-    // Union by rank (using refCount as rank)
     if (nodes[root1].refCount < nodes[root2].refCount) {
         nodes[root1].parent_id = root2;
         nodes[root2].refCount += nodes[root1].refCount;
@@ -294,7 +290,7 @@ void tr_insert(struct sound_seg* src_track, struct sound_seg* dest_track, size_t
     
     // Shift existing elements to make space for insertion
     for (size_t i = dest_track->length; i > destpos; i--) {
-        track->nodes[i + len - 1] = track->nodes[i - 1];
+        dest_track->nodes[i + len - 1] = dest_track->nodes[i - 1];
     }
     
     size_t offset = 0;
