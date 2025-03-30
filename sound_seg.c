@@ -191,13 +191,16 @@ void tr_write(struct sound_seg* track, const int16_t* src, size_t pos, size_t le
 bool tr_delete_range(struct sound_seg* track, size_t pos, size_t len) {
     if (!track || pos >= track->length || len == 0) return false;
     size_t end = pos + len > track->length ? track->length : pos + len;
+    
+    // First pass: check if we can delete the range
     for (size_t i = pos; i < end; i++) {
         if (track->nodes[i]->is_parent && track->nodes[i]->ref_count > 1) {
             return false;
         }
     }
-
-    for (size_t i = pos; i < track->length - len; i++) {
+    
+    // Second pass: decrement reference counts for parents
+    for (size_t i = pos; i < end; i++) {
         if (track->nodes[i]->parent_id != track->nodes[i]->node_id) {
             struct sound_seg *head = all_tracks;
             uint16_t parent_id = track->nodes[i]->parent_id;
@@ -213,12 +216,20 @@ bool tr_delete_range(struct sound_seg* track, size_t pos, size_t len) {
                 head = head->next;
             }
         }
-        track->nodes[i] = track->nodes[i + len];
     }
-    for (size_t i = track->length - len; i < track->length; i++) {
+    
+    // Third pass: free the nodes in the range
+    for (size_t i = pos; i < end; i++) {
         free(track->nodes[i]);
     }
-    track->length -= len;
+    
+    // Fourth pass: shift remaining nodes
+    size_t shift_amount = end - pos;
+    for (size_t i = pos; i < track->length - shift_amount; i++) {
+        track->nodes[i] = track->nodes[i + shift_amount];
+    }
+    
+    track->length -= shift_amount;
     return true;
 }
 
