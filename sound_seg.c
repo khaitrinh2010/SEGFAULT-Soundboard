@@ -324,13 +324,31 @@ void tr_insert(struct sound_seg* src_track, struct sound_seg* dest_track, size_t
     if (new_length > dest_track->capacity) {
         tr_resize(dest_track, new_length * 2 > dest_track->capacity ? new_length * 2 : dest_track->capacity + 1);
     }
+    
+    // Shift existing nodes to make space
     for (size_t i = dest_track->length; i > destpos; i--) {
         dest_track->nodes[i + len - 1] = dest_track->nodes[i - 1];
     }
+    
+    // Update length before copying nodes
     dest_track->length = new_length;
+    
+    // Copy nodes with proper offset handling for self-insertion
     for (size_t i = 0; i < len; i++) {
-        uint16_t src_idx = srcpos + i;
         uint16_t dest_idx = destpos + i;
+        uint16_t src_idx;
+        
+        if (src_track == dest_track) {
+            // For self-insertion, adjust source position based on whether we're inserting before or after the source
+            if (destpos <= srcpos) {
+                src_idx = srcpos + i;
+            } else {
+                src_idx = srcpos + i + len;
+            }
+        } else {
+            src_idx = srcpos + i;
+        }
+        
         uint16_t src_cluster_id = src_track->nodes[src_idx]->cluster_id;
         dest_track->nodes[dest_idx]->node_id = next_node_id;
         dest_track->nodes[dest_idx]->parent_id = next_node_id;
