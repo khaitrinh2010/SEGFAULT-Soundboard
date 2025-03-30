@@ -26,7 +26,10 @@ struct sound_seg {
     size_t length;
     size_t capacity;
     uint16_t next_node_id;
+    struct sound_seg* next; // Linked list pointer to next track
 };
+
+static struct sound_seg* all_tracks = NULL; // Global list of all tracks
 
 static uint16_t find_root(struct sound_seg_node* nodes, uint16_t node_id) {
     if (nodes[node_id].parent_id != node_id) {
@@ -35,11 +38,15 @@ static uint16_t find_root(struct sound_seg_node* nodes, uint16_t node_id) {
     return nodes[node_id].parent_id;
 }
 
-static void update_cluster(struct sound_seg* track, uint16_t root_id, int16_t new_sample) {
-    for (size_t i = 0; i < track->length; i++) {
-        if (find_root(track->nodes, i) == root_id) {
-            track->nodes[i].sample = new_sample;
+static void update_cluster(uint16_t root_id, int16_t new_sample) {
+    struct sound_seg* track = all_tracks;
+    while (track != NULL) {
+        for (size_t i = 0; i < track->length; i++) {
+            if (find_root(track->nodes, i) == root_id) {
+                track->nodes[i].sample = new_sample;
+            }
         }
+        track = track->next;
     }
 }
 
@@ -104,11 +111,26 @@ struct sound_seg* tr_init(void) {
     track->length = 0;
     track->capacity = 0;
     track->next_node_id = 0;
+    track->next = all_tracks; // Add to global list
+    all_tracks = track;
     return track;
 }
 
 void tr_destroy(struct sound_seg* track) {
     if (!track) return;
+    struct sound_seg* current = all_tracks;
+    struct sound_seg* prev = NULL;
+    while (current != NULL && current != track) {
+        prev = current;
+        current = current->next;
+    }
+    if (current == track) {
+        if (prev) {
+            prev->next = current->next;
+        } else {
+            all_tracks = current->next;
+        }
+    }
     free(track->nodes);
     free(track);
 }
@@ -161,7 +183,7 @@ void tr_write(struct sound_seg* track, const int16_t* src, size_t pos, size_t le
     }
     for (size_t i = 0; i < len; i++) {
         uint16_t root_id = find_root(track->nodes, pos + i);
-        update_cluster(track, root_id, src[i]);
+        update_cluster(root_id, src[i]);
     }
 }
 
