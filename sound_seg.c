@@ -4,7 +4,6 @@
 #include <stdbool.h>
 #include <string.h>
 #include <stdio.h>
-
 #define OFFSET 40
 #define OFFSET_TO_AUDIO_DATA 44
 
