@@ -170,8 +170,18 @@ void tr_write(struct sound_seg* track, const int16_t* src, size_t pos, size_t le
     if (new_length > track->capacity) {
         tr_resize(track, new_length * 2 > track->capacity ? new_length * 2 : track->capacity + 1);
     }
+    
+    // Initialize new nodes if writing beyond current length
     if (new_length > track->length) {
         for (size_t i = track->length; i < new_length; i++) {
+            track->nodes[i] = malloc(sizeof(struct sound_seg_node));
+            if (!track->nodes[i]) {
+                // Handle allocation failure
+                for (size_t j = track->length; j < i; j++) {
+                    free(track->nodes[j]);
+                }
+                return;
+            }
             track->nodes[i]->node_id = next_node_id;
             track->nodes[i]->parent_id = next_node_id;
             track->nodes[i]->cluster_id = next_cluster_id++;
@@ -182,6 +192,8 @@ void tr_write(struct sound_seg* track, const int16_t* src, size_t pos, size_t le
         }
         track->length = new_length;
     }
+    
+    // Update samples for the write range
     for (size_t i = 0; i < len; i++) {
         uint16_t cluster_id = track->nodes[pos + i]->cluster_id;
         update_cluster(cluster_id, src[i]);
@@ -328,6 +340,7 @@ void tr_insert(struct sound_seg* src_track, struct sound_seg* dest_track, size_t
         dest_track->nodes[dest_idx]->is_parent = false;
         src_track->nodes[src_idx]->ref_count++;
         src_track->nodes[src_idx]->is_parent = true;
+        next_node_id++;
     }
 }
 
