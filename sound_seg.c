@@ -219,43 +219,34 @@ bool tr_delete_range(struct sound_seg* track, size_t pos, size_t len) {
             return false;
         }
     }
-    
-    // Second pass: decrement reference counts for parents
     for (size_t i = pos; i < end; i++) {
-        if (track->nodes[i]->parent_id != track->nodes[i]->node_id) {
-            struct sound_seg *head = all_tracks;
-            uint16_t parent_id = track->nodes[i]->parent_id;
-            int found = 0;
-            while (head != NULL) {
-                for (size_t j = 0; j < head->length; j++) {
-                    if (head->nodes[j]->node_id == parent_id) {
-                        head->nodes[j]->ref_count--;
-                        found = 1;
+        if (track->nodes[i]) {
+            if (track->nodes[i]->parent_id != track->nodes[i]->node_id) {
+                struct sound_seg* head = all_tracks;
+                while (head) {
+                    for (size_t j = 0; j < head->length; j++) {
+                        if (head->nodes[j]->node_id == track->nodes[i]->parent_id) {
+                            head->nodes[j]->ref_count--;
+                            break;
+                        }
                     }
+                    head = head->next;
                 }
-                if (found) break;
-                head = head->next;
             }
+            if (track->nodes[i]->ref_count <= 1 || !track->nodes[i]->is_parent) {
+                free(track->nodes[i]);
+            }
+            track->nodes[i] = NULL;
         }
     }
-    
-    // Third pass: free the nodes in the range
-    for (size_t i = pos; i < end; i++) {
-        free(track->nodes[i]);
-        track->nodes[i] = NULL;
-    }
-    
-    // Fourth pass: shift remaining nodes
+
     size_t shift_amount = end - pos;
     for (size_t i = pos; i < track->length - shift_amount; i++) {
         track->nodes[i] = track->nodes[i + shift_amount];
     }
-    
-    // Fifth pass: clear the remaining pointers at the end
     for (size_t i = track->length - shift_amount; i < track->length; i++) {
         track->nodes[i] = NULL;
     }
-    
     track->length -= shift_amount;
     return true;
 }
@@ -342,11 +333,9 @@ void tr_insert(struct sound_seg* src_track, struct sound_seg* dest_track, size_t
             src_copy[i] = src_track->nodes[srcpos + i];
         }
     }
-
     for (size_t i = dest_track->length; i > destpos; i--) {
         dest_track->nodes[i + len - 1] = dest_track->nodes[i - 1];
     }
-
     for (size_t i = 0; i < len; i++) {
         dest_track->nodes[destpos + i] = malloc(sizeof(struct sound_seg_node));
         if (!dest_track->nodes[destpos + i]) {
@@ -359,9 +348,7 @@ void tr_insert(struct sound_seg* src_track, struct sound_seg* dest_track, size_t
             return;
         }
     }
-
     dest_track->length = new_length;
-
     for (size_t i = 0; i < len; i++) {
         struct sound_seg_node* source_node = (src_copy != NULL) ? src_copy[i] : src_track->nodes[srcpos + i];
         struct sound_seg_node* new_node = dest_track->nodes[destpos + i];
@@ -374,7 +361,6 @@ void tr_insert(struct sound_seg* src_track, struct sound_seg* dest_track, size_t
         source_node->ref_count++;
         source_node->is_parent = true;
     }
-
     if (src_copy) free(src_copy);
 }
 
