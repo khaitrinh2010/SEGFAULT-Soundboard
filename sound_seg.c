@@ -221,12 +221,19 @@ bool tr_delete_range(struct sound_seg* track, size_t pos, size_t len) {
     // Third pass: free the nodes in the range
     for (size_t i = pos; i < end; i++) {
         free(track->nodes[i]);
+        track->nodes[i] = NULL;
     }
     
     // Fourth pass: shift remaining nodes
     size_t shift_amount = end - pos;
     for (size_t i = pos; i < track->length - shift_amount; i++) {
         track->nodes[i] = track->nodes[i + shift_amount];
+    }
+    
+    // Fifth pass: free the remaining nodes at the end
+    for (size_t i = track->length - shift_amount; i < track->length; i++) {
+        free(track->nodes[i]);
+        track->nodes[i] = NULL;
     }
     
     track->length -= shift_amount;
