@@ -357,7 +357,8 @@ void tr_insert(struct sound_seg* src_track, struct sound_seg* dest_track, size_t
                 src_idx = srcpos + i;
             } else {
                 // If inserting after the source, need to account for the shifted nodes
-                src_idx = srcpos + i + (destpos - srcpos);
+                // and the fact that we're inserting after a deletion
+                src_idx = srcpos + i;
             }
         } else {
             src_idx = srcpos + i;
