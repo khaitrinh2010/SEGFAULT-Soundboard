@@ -13,7 +13,7 @@ uint16_t node_count = 0;
 struct sound_seg_node {
     union A {
         struct {
-            int refCount;
+            uint8_t refCount;
             int16_t sample;
         } parent_data;
         struct {
