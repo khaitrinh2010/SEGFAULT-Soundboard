@@ -7,12 +7,10 @@
 
 #define OFFSET 40
 #define OFFSET_TO_AUDIO_DATA 44
-#define MAX_NODES 65535  // Max nodes based on uint16_t
+#define MAX_NODES 65535
 
-// Global node pool to store all nodes
 struct sound_seg_node* node_pool[MAX_NODES] = {0};
 uint16_t node_count = 0;
-
 #pragma pack(push, 1)
 struct sound_seg_node {
     union A {
