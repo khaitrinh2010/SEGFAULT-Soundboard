@@ -110,6 +110,7 @@ struct sound_seg* tr_init(void) {
 
 void tr_destroy(struct sound_seg* track) {
     if (!track) return;
+
     struct sound_seg* current = all_tracks;
     struct sound_seg* prev = NULL;
     while (current != NULL && current != track) {
@@ -123,16 +124,16 @@ void tr_destroy(struct sound_seg* track) {
             all_tracks = current->next;
         }
     }
-    for (size_t i = 0; i < track->capacity; i++) {
+
+    for (size_t i = 0; i < track->length; i++) {
         if (track->nodes[i]) {
             free(track->nodes[i]);
-            track->nodes[i] = NULL;
         }
     }
-
     free(track->nodes);
     free(track);
 }
+
 
 
 size_t tr_length(struct sound_seg* track) {
