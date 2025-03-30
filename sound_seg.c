@@ -12,16 +12,16 @@
 struct sound_seg_node {
     union {
         struct {
-            int16_t sample;      // 2 bytes, only stored in parent
-            uint16_t id;         // 2 bytes, unique for parents
-            uint16_t refCount;   // 2 bytes (max 65,535 references)
+            int16_t sample;
+            uint16_t id;
+            uint16_t refCount;
         } parent_data;
         struct {
-            uint16_t parent_id;  // 2 bytes, references parent's id
+            uint16_t parent_id;
         } child_data;
     } A;
-    struct sound_seg_node* next; // 8 bytes (64-bit system)
-    bool isParent;               // 1 byte (padded)
+    struct sound_seg_node* next;
+    bool isParent;
 };
 #pragma pack(pop)
 
