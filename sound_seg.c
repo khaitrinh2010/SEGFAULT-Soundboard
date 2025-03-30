@@ -332,58 +332,51 @@ void tr_insert(struct sound_seg* src_track, struct sound_seg* dest_track, size_t
     if (new_length > dest_track->capacity) {
         tr_resize(dest_track, new_length * 2 > dest_track->capacity ? new_length * 2 : dest_track->capacity + 1);
     }
-    
-    // Shift existing nodes to make space
+
+    struct sound_seg_node** src_copy = NULL;
+    if (src_track == dest_track) {
+        src_copy = malloc(len * sizeof(struct sound_seg_node*));
+        if (!src_copy) return;
+        for (size_t i = 0; i < len; i++) {
+            src_copy[i] = src_track->nodes[srcpos + i];
+        }
+    }
+
     for (size_t i = dest_track->length; i > destpos; i--) {
         dest_track->nodes[i + len - 1] = dest_track->nodes[i - 1];
     }
-    
-    // Allocate and initialize new nodes
+
     for (size_t i = 0; i < len; i++) {
         dest_track->nodes[destpos + i] = malloc(sizeof(struct sound_seg_node));
         if (!dest_track->nodes[destpos + i]) {
-            // Handle allocation failure
+            // Cleanup on failure
             for (size_t j = 0; j < i; j++) {
                 free(dest_track->nodes[destpos + j]);
+                dest_track->nodes[destpos + j] = NULL;
             }
+            if (src_copy) free(src_copy);
             return;
         }
     }
-    
-    // Update length before copying nodes
+
     dest_track->length = new_length;
-    
-    // Copy nodes with proper offset handling for self-insertion
+
     for (size_t i = 0; i < len; i++) {
-        uint16_t dest_idx = destpos + i;
-        uint16_t src_idx;
-        
-        if (src_track == dest_track) {
-            // For self-insertion, we need to handle the offset based on the insertion point
-            if (destpos <= srcpos) {
-                // If inserting before the source, use original position
-                src_idx = srcpos + i;
-            } else {
-                // If inserting after the source, need to account for the shifted nodes
-                // and the fact that we're inserting after a deletion
-                src_idx = srcpos + i;
-            }
-        } else {
-            src_idx = srcpos + i;
-        }
-        
-        uint16_t src_cluster_id = src_track->nodes[src_idx]->cluster_id;
-        dest_track->nodes[dest_idx]->node_id = next_node_id;
-        dest_track->nodes[dest_idx]->parent_id = next_node_id;
-        dest_track->nodes[dest_idx]->cluster_id = src_cluster_id;
-        dest_track->nodes[dest_idx]->ref_count = 1;
-        dest_track->nodes[dest_idx]->sample = src_track->nodes[src_idx]->sample;
-        dest_track->nodes[dest_idx]->is_parent = false;
-        src_track->nodes[src_idx]->ref_count++;
-        src_track->nodes[src_idx]->is_parent = true;
-        next_node_id++;
+        struct sound_seg_node* source_node = (src_copy != NULL) ? src_copy[i] : src_track->nodes[srcpos + i];
+        struct sound_seg_node* new_node = dest_track->nodes[destpos + i];
+        new_node->node_id = next_node_id++;
+        new_node->parent_id = new_node->node_id;
+        new_node->cluster_id = source_node->cluster_id;
+        new_node->ref_count = 1;
+        new_node->sample = source_node->sample;
+        new_node->is_parent = false;
+        source_node->ref_count++;
+        source_node->is_parent = true;
     }
+
+    if (src_copy) free(src_copy);
 }
+
 
 int main(int argc, char** argv) {
     struct sound_seg* s0 = tr_init();
