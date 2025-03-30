@@ -12,7 +12,7 @@
 struct sound_seg_node {
     union {
         struct {
-            int16_t sample;      // 2 bytes
+            int16_t sample;      // 2 bytes, only stored in parent
             uint16_t id;         // 2 bytes, unique for parents
             uint16_t refCount;   // 2 bytes (max 65,535 references)
         } parent_data;
@@ -44,16 +44,11 @@ struct sound_seg_node* find_node_by_id(struct sound_seg* track, uint16_t id) {
     return NULL;
 }
 
-// Helper function to update all nodes (parent and children) with a given ID
-void update_related_nodes(struct sound_seg* track, uint16_t id, int16_t new_sample) {
-    struct sound_seg_node* current = track->head;
-    while (current) {
-        if (current->isParent && current->A.parent_data.id == id) {
-            current->A.parent_data.sample = new_sample;
-        } else if (!current->isParent && current->A.child_data.parent_id == id) {
-            // No sample to update in child, but we ensure consistency via parent
-        }
-        current = current->next;
+// Helper function to update the parent's sample for a given ID
+void update_group_sample(struct sound_seg* track, uint16_t id, int16_t new_sample) {
+    struct sound_seg_node* parent = find_node_by_id(track, id);
+    if (parent) {
+        parent->A.parent_data.sample = new_sample;
     }
 }
 
@@ -173,6 +168,7 @@ void tr_write(struct sound_seg* track, const int16_t* src, size_t pos, size_t le
     struct sound_seg_node* prev = NULL;
     size_t i = 0;
 
+    // Fill gaps with new parent nodes if position is beyond current length
     while (current && i < pos) {
         prev = current;
         current = current->next;
@@ -193,17 +189,14 @@ void tr_write(struct sound_seg* track, const int16_t* src, size_t pos, size_t le
         i++;
     }
 
+    // Write data, ensuring group synchronization
     for (size_t j = 0; j < len; j++) {
         if (current) {
             if (current->isParent) {
                 current->A.parent_data.sample = src[j];
-                update_related_nodes(track, current->A.parent_data.id, src[j]);
+                update_group_sample(track, current->A.parent_data.id, src[j]);
             } else {
-                struct sound_seg_node* parent = find_node_by_id(track, current->A.child_data.parent_id);
-                if (parent) {
-                    parent->A.parent_data.sample = src[j];
-                    update_related_nodes(track, current->A.child_data.parent_id, src[j]);
-                }
+                update_group_sample(track, current->A.child_data.parent_id, src[j]);
             }
             prev = current;
             current = current->next;
@@ -239,7 +232,7 @@ bool tr_delete_range(struct sound_seg* track, size_t pos, size_t len) {
     struct sound_seg_node* check = current;
     for (size_t j = 0; j < len && check; j++) {
         if (check->isParent && check->A.parent_data.refCount > 0) {
-            return false;
+            return false; // Cannot delete parent with active children
         }
         check = check->next;
     }
@@ -319,7 +312,7 @@ char* tr_identify(struct sound_seg* target, struct sound_seg* ad) {
         }
     }
     free(target_data);
-    free(ad_data);
+free(ad_data);
     if (used == 0) {
         free(result);
         return strdup("");
