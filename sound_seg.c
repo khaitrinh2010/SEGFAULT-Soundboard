@@ -337,7 +337,6 @@ void tr_insert(struct sound_seg* src_track, struct sound_seg* dest_track,
         i++;
     }
     if (src_current_id == UINT16_MAX) return;
-
     uint16_t dest_current_id = dest_track->head_id;
     uint16_t dest_prev_id = UINT16_MAX;
     i = 0;
@@ -348,11 +347,9 @@ void tr_insert(struct sound_seg* src_track, struct sound_seg* dest_track,
         dest_current_id = dest_current->next_id;
         i++;
     }
-
     uint16_t insert_head_id = UINT16_MAX;
     uint16_t insert_tail_id = UINT16_MAX;
     uint16_t src_temp_id = src_current_id;
-
     for (size_t j = 0; j < len && src_temp_id != UINT16_MAX; j++) {
         uint16_t new_id = alloc_node();
         if (new_id == UINT16_MAX) return;
