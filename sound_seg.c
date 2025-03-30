@@ -349,11 +349,15 @@ void tr_insert(struct sound_seg* src_track, struct sound_seg* dest_track, size_t
     for (size_t i = 0; i < len; i++) {
         uint16_t dest_idx = destpos + i;
         uint16_t src_idx;
+        
         if (src_track == dest_track) {
+            // For self-insertion, we need to handle the offset based on the insertion point
             if (destpos <= srcpos) {
+                // If inserting before the source, use original position
                 src_idx = srcpos + i;
             } else {
-                src_idx = srcpos + i + len;
+                // If inserting after the source, need to account for the shifted nodes
+                src_idx = srcpos + i + (destpos - srcpos);
             }
         } else {
             src_idx = srcpos + i;
