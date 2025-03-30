@@ -9,7 +9,7 @@
 #define MAX_NODES 65535
 struct sound_seg_node* node_pool[MAX_NODES] = {0};
 uint16_t node_count = 0;
-#pragma pack(push, 1)
+
 struct sound_seg_node {
     union A {
         struct {
@@ -23,7 +23,7 @@ struct sound_seg_node {
     uint16_t next_id;
     bool isParent;
 };
-#pragma pack(pop)
+
 
 struct sound_seg {
     uint16_t head_id;
