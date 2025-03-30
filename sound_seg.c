@@ -7,33 +7,34 @@
 
 #define OFFSET 40
 #define OFFSET_TO_AUDIO_DATA 44
-#define MAX_NODES 65535
+#define MAX_NODES 65535  // Max nodes based on uint16_t
 
 struct sound_seg_node* node_pool[MAX_NODES] = {0};
 uint16_t node_count = 0;
+
 #pragma pack(push, 1)
 struct sound_seg_node {
     union A {
         struct {
-            int refCount;
-            int16_t sample;
-        } parent_data;
+            int refCount;    // 4 bytes
+            int16_t sample;  // 2 bytes
+        } parent_data;       // Total: 6 bytes
         struct {
-            uint16_t parent_id;          // Replaced pointer with ID
-            int16_t* parent_data_address;
-        } child_data;
+            uint16_t parent_id;  // 2 bytes (replaces pointer)
+        } child_data;        // Total: 2 bytes
     } A;
-    uint16_t next_id;                    // Replaced pointer with ID
-    bool isParent;
+    uint16_t next_id;        // 2 bytes
+    bool isParent;           // 1 byte
+    // Total size: 9 bytes (with padding, likely 12 bytes due to alignment)
 };
 #pragma pack(pop)
 
 struct sound_seg {
-    uint16_t head_id;                    // Replaced pointer with ID
+    uint16_t head_id;        // 2 bytes
 };
 
 uint16_t alloc_node() {
-    if (node_count >= MAX_NODES) return UINT16_MAX; // No more nodes available
+    if (node_count >= MAX_NODES) return UINT16_MAX;
     struct sound_seg_node* node = malloc(sizeof(struct sound_seg_node));
     if (!node) return UINT16_MAX;
     node_pool[node_count] = node;
@@ -50,7 +51,23 @@ struct sound_seg_node* get_node(uint16_t id) {
     return (id < node_count) ? node_pool[id] : NULL;
 }
 
-// Load a WAV file into buffer (unchanged)
+// Helper to get a node's sample (handles parent/child logic)
+int16_t get_sample(uint16_t node_id) {
+    struct sound_seg_node* node = get_node(node_id);
+    if (!node) return 0; // Default value for invalid node
+    if (node->isParent) return node->A.parent_data.sample;
+    return get_sample(node->A.child_data.parent_id); // Recursively get parent's sample
+}
+
+// Helper to set a node's sample (handles parent/child logic)
+void set_sample(uint16_t node_id, int16_t value) {
+    struct sound_seg_node* node = get_node(node_id);
+    if (!node) return;
+    if (node->isParent) node->A.parent_data.sample = value;
+    else set_sample(node->A.child_data.parent_id, value); // Recursively set parent's sample
+}
+
+// Unchanged WAV functions
 void wav_load(const char* filename, int16_t* dest) {
     FILE *file = fopen(filename, "rb");
     if (file == NULL) {
@@ -65,7 +82,6 @@ void wav_load(const char* filename, int16_t* dest) {
     fclose(file);
 }
 
-// Save a WAV file from buffer (unchanged)
 void wav_save(const char* fname, int16_t* src, size_t len) {
     FILE *file = fopen(fname, "wb");
     if (file == NULL) {
@@ -113,7 +129,7 @@ void wav_save(const char* fname, int16_t* src, size_t len) {
 struct sound_seg* tr_init(void) {
     struct sound_seg* track = malloc(sizeof(struct sound_seg));
     if (!track) return NULL;
-    track->head_id = UINT16_MAX;  // Null equivalent
+    track->head_id = UINT16_MAX;
     return track;
 }
 
@@ -153,9 +169,9 @@ void tr_read(struct sound_seg* track, int16_t* dest, size_t pos, size_t len) {
         i++;
     }
     for (size_t j = 0; j < len && current_id != UINT16_MAX; j++) {
+        dest[j] = get_sample(current_id);
         struct sound_seg_node* current = get_node(current_id);
         if (!current) break;
-        dest[j] = current->isParent ? current->A.parent_data.sample : *(current->A.child_data.parent_data_address);
         current_id = current->next_id;
     }
 }
@@ -190,12 +206,9 @@ void tr_write(struct sound_seg* track, const int16_t* src, size_t pos, size_t le
 
     for (size_t j = 0; j < len; j++) {
         if (current_id != UINT16_MAX) {
+            set_sample(current_id, src[j]);
             struct sound_seg_node* current = get_node(current_id);
-            if (current->isParent) {
-                current->A.parent_data.sample = src[j];
-            } else {
-                *(current->A.child_data.parent_data_address) = src[j];
-            }
+            if (!current) break;
             prev_id = current_id;
             current_id = current->next_id;
         } else {
@@ -356,8 +369,7 @@ void tr_insert(struct sound_seg* src_track, struct sound_seg* dest_track,
         while (!parent_node->isParent && parent_node->A.child_data.parent_id != UINT16_MAX) {
             parent_node = get_node(parent_node->A.child_data.parent_id);
         }
-        new_node->A.child_data.parent_data_address = &parent_node->A.parent_data.sample;
-        new_node->A.child_data.parent_id = src_temp_id; // Use the original source node ID
+        new_node->A.child_data.parent_id = src_temp_id; // Link to original source node
         new_node->next_id = UINT16_MAX;
         new_node->isParent = false;
         parent_node->A.parent_data.refCount++;
