@@ -123,9 +123,17 @@ void tr_destroy(struct sound_seg* track) {
             all_tracks = current->next;
         }
     }
+    for (size_t i = 0; i < track->capacity; i++) {
+        if (track->nodes[i]) {
+            free(track->nodes[i]);
+            track->nodes[i] = NULL;
+        }
+    }
+
     free(track->nodes);
     free(track);
 }
+
 
 size_t tr_length(struct sound_seg* track) {
     return track ? track->length : 0;
