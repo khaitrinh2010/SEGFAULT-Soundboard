@@ -36,10 +36,12 @@ struct sound_seg_node* node_pool[MAX_NODES] = {0};
 uint16_t alloc_node() {
     struct sound_seg_node *newly_created_node = (struct sound_seg_node*)malloc(sizeof(struct sound_seg_node));
     if (!newly_created_node) {
-        return -1;
+        return 65535;
     }
-    node_pool[node_count++] = newly_created_node;
-    return node_count;
+    node_pool[node_count] = newly_created_node;
+    uint16_t allocated_id = node_count;
+    node_count++;
+    return allocated_id;
 }
 
 void free_node(uint16_t id) {
