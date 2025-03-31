@@ -75,8 +75,10 @@ int16_t get_sample(uint16_t node_id) {
 void set_sample(uint16_t node_id, int16_t value) {
     struct sound_seg_node* node = get_node(node_id);
     if (!node) return;
-    if (node->isParent) node->A.parent_data.sample = value;
-    else set_sample(node->A.child_data.parent_id, value);
+    while (!node->isParent) {
+        node = get_node(node->A.child_data.parent_id);
+    }
+    node->A.parent_data.sample = value;
 }
 
 void wav_load(const char* filename, int16_t* dest) {
