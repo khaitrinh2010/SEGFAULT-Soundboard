@@ -7,9 +7,7 @@
 #define OFFSET 40
 #define OFFSET_TO_AUDIO_DATA 44
 #define MAX_NODES 30000
-
 uint16_t node_count = 0;
-
 #pragma pack(push, 1)
 struct sound_seg_node {
     union A {
