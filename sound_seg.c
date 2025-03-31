@@ -26,14 +26,11 @@ struct sound_seg_node {
     bool isAncestor;
 };
 
-
 struct sound_seg {
-    uint16_t head_id; // the id of the first node in the linked list
+    uint16_t head_id;
 };
 #pragma pack(pop)
-
 struct sound_seg_node* node_pool[MAX_NODES] = {0};
-
 uint16_t alloc_node() {
     struct sound_seg_node *newly_created_node = (struct sound_seg_node*)malloc(sizeof(struct sound_seg_node));
     if (!newly_created_node) {
@@ -53,7 +50,6 @@ void free_node(uint16_t id) {
     free(node_pool[id]);
     node_pool[id] = NULL;
 }
-
 struct sound_seg_node* get_node(uint16_t id) {
     struct sound_seg_node* node = node_pool[id];
     if (!node) {
@@ -61,7 +57,6 @@ struct sound_seg_node* get_node(uint16_t id) {
     }
     return node;
 }
-
 int16_t get_sample(uint16_t node_id) {
     struct sound_seg_node* node = get_node(node_id);
     if (!node) return 0;
