@@ -22,8 +22,11 @@ struct sound_seg_node {
     } A;
     uint8_t refCount;
     uint16_t next_id;
-    bool isParent;
-    bool isAncestor;
+    struct {
+        unsigned isAncestor : 1;
+        unsigned isParent : 1;
+        unsigned reserved : 6;
+    } flags;
 };
 
 struct sound_seg {
@@ -61,7 +64,7 @@ int16_t get_sample(uint16_t node_id) {
     struct sound_seg_node* node = get_node(node_id);
     if (!node) return 0;
     int16_t result = 0;
-    while (!node->isAncestor) {
+    while (!node->flags.isAncestor) {
         node = get_node(node->A.child_data.parent_id);
     }
     result =  node->A.parent_data.sample;
@@ -71,7 +74,7 @@ int16_t get_sample(uint16_t node_id) {
 void set_sample(uint16_t node_id, int16_t value) {
     struct sound_seg_node* node = get_node(node_id);
     if (!node) return;
-    while (!node->isAncestor) {
+    while (!node->flags.isAncestor) {
         node = get_node(node->A.child_data.parent_id);
     }
     node->A.parent_data.sample = value;
@@ -209,8 +212,8 @@ void tr_write(struct sound_seg* track, const int16_t* src, size_t pos, size_t le
             uint16_t new_node_id = alloc_node();
             if (new_node_id == UINT16_MAX) return;
             struct sound_seg_node* new_node = get_node(new_node_id);
-            new_node->isParent = true;
-            new_node->isAncestor = true; // When creating new nodes, it is the ancestor
+            new_node->flags.isParent = 1;
+            new_node->flags.isAncestor = 1; // When creating new nodes, it is the ancestor
             new_node->A.parent_data.sample = 0;
             new_node->refCount = 0;
             new_node->next_id = UINT16_MAX;
@@ -236,8 +239,8 @@ void tr_write(struct sound_seg* track, const int16_t* src, size_t pos, size_t le
             uint16_t new_node_id = alloc_node();
             if (new_node_id == UINT16_MAX) return;
             struct sound_seg_node* new_node = get_node(new_node_id);
-            new_node->isParent = true;
-            new_node->isAncestor = true; // When creating new nodes, it is the ancestor
+            new_node->flags.isParent = 1;
+            new_node->flags.isAncestor = 1; // When creating new nodes, it is the ancestor
             new_node->A.parent_data.sample = src[j];
             new_node->refCount = 0;
             new_node->next_id = UINT16_MAX;
@@ -271,7 +274,7 @@ bool tr_delete_range(struct sound_seg* track, size_t pos, size_t len) {
     for (size_t j = 0; j < len && check_id != UINT16_MAX; j++) {
         struct sound_seg_node* check = get_node(check_id);
         if (!check) break;
-        if (check->isParent && check->refCount > 0) {
+        if (check->flags.isParent && check->refCount > 0) {
             return false;
         }
         check_id = check->next_id;
@@ -280,7 +283,7 @@ bool tr_delete_range(struct sound_seg* track, size_t pos, size_t len) {
         struct sound_seg_node* current = get_node(current_id);
         if (!current) break;
         uint16_t next_id = current->next_id;
-        if (!current->isParent && current->A.child_data.parent_id != UINT16_MAX) {
+        if (!current->flags.isParent && current->A.child_data.parent_id != UINT16_MAX) {
             struct sound_seg_node* parent = get_node(current->A.child_data.parent_id);
             if (parent) parent->refCount--;
         }
@@ -394,10 +397,10 @@ void tr_insert(struct sound_seg* src_track, struct sound_seg* dest_track,
         struct sound_seg_node* parent_node = get_node(src_temp_id);
         new_node->A.child_data.parent_id = src_temp_id;
         new_node->next_id = UINT16_MAX;
-        new_node->isParent = false;
-        new_node->isAncestor = false;
+        new_node->flags.isParent = 0;
+        new_node->flags.isAncestor = 0;
         parent_node->refCount++;
-        parent_node->isParent = true;
+        parent_node->flags.isParent = 1;
         if (insert_head_id == UINT16_MAX) {
             insert_head_id = insert_tail_id = new_id;
         } else {
