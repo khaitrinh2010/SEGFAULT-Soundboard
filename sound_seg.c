@@ -175,7 +175,7 @@ void tr_read(struct sound_seg* track, int16_t* dest, size_t pos, size_t len) {
     if (!track || !dest || len == 0) return;
     uint16_t id = track->head_id;
     size_t elements_have_passed = 0;
-    while (id != 65535 && elements_have_passed < len) {
+    while (id != 65535 && elements_have_passed < pos) {
         struct sound_seg_node* node = get_node(id);
         if (!node) break;
         id  = node->next_id;
