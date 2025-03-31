@@ -66,7 +66,7 @@ int16_t get_sample(uint16_t node_id) {
     struct sound_seg_node* node = get_node(node_id);
     if (!node) return 0;
     int16_t result = 0;
-    while (!node->isParent) {
+    while (!node->isAncestor) {
         node = get_node(node->A.child_data.parent_id);
     }
     result =  node->A.parent_data.sample;
