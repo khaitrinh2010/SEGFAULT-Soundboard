@@ -194,8 +194,8 @@ void tr_write(struct sound_seg* track, const int16_t* src, size_t pos, size_t le
     if (!track || !src || len == 0) return;
     uint16_t current_id = track->head_id;
     uint16_t prev_id = UINT16_MAX;
+    bool start_of_linked_list = false;
     size_t i = 0;
-
     while (current_id != UINT16_MAX && i < pos) {
         struct sound_seg_node* current = get_node(current_id);
         if (!current) return;
@@ -203,38 +203,53 @@ void tr_write(struct sound_seg* track, const int16_t* src, size_t pos, size_t le
         current_id = current->next_id;
         i++;
     }
-    while (i < pos) {
-        uint16_t new_id = alloc_node();
-        if (new_id == UINT16_MAX) return;
-        struct sound_seg_node* new_node = get_node(new_id);
-        new_node->A.parent_data.sample = 0;
-        new_node->A.parent_data.refCount = 0;
-        new_node->next_id = UINT16_MAX;
-        new_node->isParent = true;
-        if (prev_id != UINT16_MAX) get_node(prev_id)->next_id = new_id;
-        else track->head_id = new_id;
-        prev_id = new_id;
-        i++;
+    if (prev_id != UINT16_MAX) {
+        start_of_linked_list = true;
+    }
+
+    if (i < pos) {
+    // cannot reach the position we want to write
+        while (i < pos) {
+            uint16_t new_node_id = alloc_node();
+            if (new_node_id == UINT16_MAX) return;
+            struct sound_seg_node* new_node = get_node(new_node_id);
+            new_node->isParent = true;
+            new_node->A.parent_data.sample = 0;
+            new_node->A.parent_data.refCount = 0;
+            new_node->next_id = UINT16_MAX;
+            if (start_of_linked_list) {
+                get_node(prev_id)->next_id = new_node_id;
+            } else {
+                track->head_id = new_node_id;
+            }
+            prev_id = new_node_id;
+            i++;;
+        }
     }
 
     for (size_t j = 0; j < len; j++) {
         if (current_id != UINT16_MAX) {
-            set_sample(current_id, src[j]);
             struct sound_seg_node* current = get_node(current_id);
-            if (!current) break;
+            if (!current) return;
+            set_sample(current_id, src[j]);
             prev_id = current_id;
             current_id = current->next_id;
-        } else {
-            uint16_t new_id = alloc_node();
-            if (new_id == UINT16_MAX) return;
-            struct sound_seg_node* new_node = get_node(new_id);
+        }
+        else { // have to create spaces for new nodes
+            uint16_t new_node_id = alloc_node();
+            if (new_node_id == UINT16_MAX) return;
+            struct sound_seg_node* new_node = get_node(new_node_id);
+            new_node->isParent = true;
             new_node->A.parent_data.sample = src[j];
             new_node->A.parent_data.refCount = 0;
             new_node->next_id = UINT16_MAX;
-            new_node->isParent = true;
-            if (prev_id != UINT16_MAX) get_node(prev_id)->next_id = new_id;
-            else track->head_id = new_id;
-            prev_id = new_id;
+            if (prev_id != UINT16_MAX) {
+                get_node(prev_id)->next_id = new_node_id;
+            } else {
+                track->head_id = new_node_id;
+            }
+            prev_id = new_node_id;
+
         }
     }
 }
