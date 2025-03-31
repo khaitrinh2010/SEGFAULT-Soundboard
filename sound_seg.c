@@ -142,19 +142,19 @@ void wav_save(const char* fname, int16_t* src, size_t len) {
 struct sound_seg* tr_init(void) {
     struct sound_seg* track = malloc(sizeof(struct sound_seg));
     if (!track) return NULL;
-    track->head_id = UINT16_MAX;
+    track->head_id = UINT16_MAX; //Initialize a track, no head yet, basically this head is serves as the end of the linked list, just like the '\0' in a string
     return track;
 }
 
 void tr_destroy(struct sound_seg* track) {
     if (!track) return;
-    uint16_t current_id = track->head_id;
-    while (current_id != UINT16_MAX) {
-        struct sound_seg_node* current = get_node(current_id);
-        if (!current) break;
-        uint16_t next_id = current->next_id;
-        free_node(current_id);
-        current_id = next_id;
+    uint16_t id = track->head_id;
+    while (id != 65535) {
+        struct sound_seg_node* node = get_node(id);
+        if (!node) break;
+        uint16_t next_id = node->next_id;
+        free_node(id);
+        id = next_id;
     }
     free(track);
 }
@@ -173,19 +173,20 @@ size_t tr_length(struct sound_seg* track) {
 
 void tr_read(struct sound_seg* track, int16_t* dest, size_t pos, size_t len) {
     if (!track || !dest || len == 0) return;
-    uint16_t current_id = track->head_id;
-    size_t i = 0;
-    while (current_id != UINT16_MAX && i < pos) {
-        struct sound_seg_node* current = get_node(current_id);
-        if (!current) return;
-        current_id = current->next_id;
-        i++;
+    uint16_t id = track->head_id;
+    size_t elements_have_passed = 0;
+    while (id != 65535 && elements_have_passed < len) {
+        struct sound_seg_node* node = get_node(id);
+        if (!node) break;
+        id  = node->next_id;
+        elements_have_passed++;
     }
-    for (size_t j = 0; j < len && current_id != UINT16_MAX; j++) {
-        dest[j] = get_sample(current_id);
-        struct sound_seg_node* current = get_node(current_id);
+    //Now id stop at the elements we want to read
+    for (size_t i = 0; i < len; i++) {
+        struct sound_seg_node* current = get_node(id);
         if (!current) break;
-        current_id = current->next_id;
+        dest[i] = get_sample(id);
+        id  = current->next_id;
     }
 }
 
