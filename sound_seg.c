@@ -4,7 +4,6 @@
 #include <stdbool.h>
 #include <string.h>
 #include <stdio.h>
-
 #define OFFSET 40
 #define OFFSET_TO_AUDIO_DATA 44
 #define MAX_NODES 65535
@@ -14,16 +13,21 @@ uint16_t node_count = 0;
 #pragma pack(push, 1)
 struct sound_seg_node {
     union A {
-        struct { int16_t sample; } parent_data; // Only for ancestors
-        struct { uint16_t parent_id; } child_data; // For all non-ancestors
+        struct {
+            int16_t sample;
+        } parent_data;
+        struct {
+            uint16_t parent_id;
+        } child_data;
     } A;
-    uint8_t refCount; // Number of direct children, meaningful only for parents
+    uint8_t refCount;
     uint16_t next_id;
-    bool isParent; // True if this node has children (not necessarily an ancestor)
+    bool isParent;
 };
 
+
 struct sound_seg {
-    uint16_t head_id;
+    uint16_t head_id; // the id of the first node in the linked list
 };
 #pragma pack(pop)
 
@@ -33,60 +37,55 @@ uint16_t alloc_node() {
     if (node_count >= MAX_NODES) return UINT16_MAX;
     struct sound_seg_node *new_node = (struct sound_seg_node*)malloc(sizeof(struct sound_seg_node));
     if (!new_node) return UINT16_MAX;
-    new_node->isParent = false;           // Starts as child
-    new_node->refCount = 0;               // No children yet
-    new_node->A.child_data.parent_id = UINT16_MAX; // No parent by default
-    new_node->next_id = UINT16_MAX;       // End of list
+    new_node->isParent = false;
+    new_node->refCount = 0;
+    new_node->A.child_data.parent_id = UINT16_MAX;
+    new_node->next_id = UINT16_MAX;
     node_pool[node_count] = new_node;
-    return node_count++;
+    uint16_t allocated_id = node_count++;
+    return allocated_id;
 }
 
 void free_node(uint16_t id) {
-    if (id >= MAX_NODES || !node_pool[id]) return;
     struct sound_seg_node* node = node_pool[id];
-    if (!node->isParent && node->A.child_data.parent_id != UINT16_MAX) {
-        struct sound_seg_node* parent = get_node(node->A.child_data.parent_id);
-        if (parent) parent->refCount--;
-    }
+    if ( !node ) {
+        return;
+    };
     free(node_pool[id]);
     node_pool[id] = NULL;
 }
 
 struct sound_seg_node* get_node(uint16_t id) {
-    if (id >= MAX_NODES || !node_pool[id]) return NULL;
-    return node_pool[id];
+    struct sound_seg_node* node = node_pool[id];
+    if (!node) {
+        return NULL;
+    }
+    return node;
 }
 
 int16_t get_sample(uint16_t node_id) {
     struct sound_seg_node* node = get_node(node_id);
     if (!node) return 0;
-    while (!node->isParent && node->A.child_data.parent_id != UINT16_MAX) {
+    int16_t result = 0;
+    while (!node->isParent) {
         node = get_node(node->A.child_data.parent_id);
-        if (!node) return 0;
     }
-    return node->isParent ? node->A.parent_data.sample : 0; // Only parents have sample
+    result =  node->A.parent_data.sample;
+    return result;
 }
 
 void set_sample(uint16_t node_id, int16_t value) {
     struct sound_seg_node* node = get_node(node_id);
     if (!node) return;
-    struct sound_seg_node* original_node = node; // Store original for conversion check
-    while (!node->isParent && node->A.child_data.parent_id != UINT16_MAX) {
+    while (!node->isParent) {
         node = get_node(node->A.child_data.parent_id);
-        if (!node) return;
     }
-    if (!node->isParent) { // Convert original node to parent if it’s a leaf
-        original_node->isParent = true;
-        original_node->A.parent_data.sample = value;
-        original_node->A.child_data.parent_id = UINT16_MAX; // Clear parent link
-    } else {
-        node->A.parent_data.sample = value;
-    }
+    node->A.parent_data.sample = value;
 }
 
 void wav_load(const char* filename, int16_t* dest) {
     FILE *file = fopen(filename, "rb");
-    if (!file) {
+    if (file == NULL) {
         printf("Error opening file\n");
         return;
     }
@@ -100,7 +99,7 @@ void wav_load(const char* filename, int16_t* dest) {
 
 void wav_save(const char* fname, int16_t* src, size_t len) {
     FILE *file = fopen(fname, "wb");
-    if (!file) {
+    if (file == NULL) {
         printf("Error opening file\n");
         return;
     }
@@ -145,14 +144,14 @@ void wav_save(const char* fname, int16_t* src, size_t len) {
 struct sound_seg* tr_init(void) {
     struct sound_seg* track = malloc(sizeof(struct sound_seg));
     if (!track) return NULL;
-    track->head_id = UINT16_MAX;
+    track->head_id = UINT16_MAX; //Initialize a track, no head yet, basically this head is serves as the end of the linked list, just like the '\0' in a string
     return track;
 }
 
 void tr_destroy(struct sound_seg* track) {
     if (!track) return;
     uint16_t id = track->head_id;
-    while (id != UINT16_MAX) {
+    while (id != 65535) {
         struct sound_seg_node* node = get_node(id);
         if (!node) break;
         uint16_t next_id = node->next_id;
@@ -163,13 +162,12 @@ void tr_destroy(struct sound_seg* track) {
 }
 
 size_t tr_length(struct sound_seg* track) {
-    if (!track) return 0;
     size_t length = 0;
     uint16_t current_id = track->head_id;
     while (current_id != UINT16_MAX) {
+        length++;
         struct sound_seg_node* current = get_node(current_id);
         if (!current) break;
-        length++;
         current_id = current->next_id;
     }
     return length;
@@ -178,18 +176,19 @@ size_t tr_length(struct sound_seg* track) {
 void tr_read(struct sound_seg* track, int16_t* dest, size_t pos, size_t len) {
     if (!track || !dest || len == 0) return;
     uint16_t id = track->head_id;
-    size_t elements_passed = 0;
-    while (id != UINT16_MAX && elements_passed < pos) {
+    size_t elements_have_passed = 0;
+    while (id != 65535 && elements_have_passed < pos) {
         struct sound_seg_node* node = get_node(id);
-        if (!node) return;
-        id = node->next_id;
-        elements_passed++;
+        if (!node) break;
+        id  = node->next_id;
+        elements_have_passed++;
     }
-    for (size_t i = 0; i < len && id != UINT16_MAX; i++) {
+    //Now id stop at the elements we want to read
+    for (size_t i = 0; i < len; i++) {
         struct sound_seg_node* current = get_node(id);
         if (!current) break;
         dest[i] = get_sample(id);
-        id = current->next_id;
+        id  = current->next_id;
     }
 }
 
@@ -197,6 +196,7 @@ void tr_write(struct sound_seg* track, const int16_t* src, size_t pos, size_t le
     if (!track || !src || len == 0) return;
     uint16_t current_id = track->head_id;
     uint16_t prev_id = UINT16_MAX;
+    bool start_of_linked_list = false;
     size_t i = 0;
     while (current_id != UINT16_MAX && i < pos) {
         struct sound_seg_node* current = get_node(current_id);
@@ -205,42 +205,53 @@ void tr_write(struct sound_seg* track, const int16_t* src, size_t pos, size_t le
         current_id = current->next_id;
         i++;
     }
-    bool start_of_linked_list = (prev_id != UINT16_MAX);
+    if (prev_id != UINT16_MAX) {
+        start_of_linked_list = true;
+    }
 
     if (i < pos) {
+    // cannot reach the position we want to write
         while (i < pos) {
             uint16_t new_node_id = alloc_node();
             if (new_node_id == UINT16_MAX) return;
             struct sound_seg_node* new_node = get_node(new_node_id);
+            new_node->isParent = true;
+            new_node->A.parent_data.sample = 0;
+            new_node->refCount = 0;
+            new_node->next_id = UINT16_MAX;
             if (start_of_linked_list) {
                 get_node(prev_id)->next_id = new_node_id;
             } else {
                 track->head_id = new_node_id;
             }
             prev_id = new_node_id;
-            i++;
+            i++;;
         }
     }
 
     for (size_t j = 0; j < len; j++) {
         if (current_id != UINT16_MAX) {
-            set_sample(current_id, src[j]);
             struct sound_seg_node* current = get_node(current_id);
             if (!current) return;
+            set_sample(current_id, src[j]);
             prev_id = current_id;
             current_id = current->next_id;
-        } else {
+        }
+        else { // have to create spaces for new nodes
             uint16_t new_node_id = alloc_node();
             if (new_node_id == UINT16_MAX) return;
             struct sound_seg_node* new_node = get_node(new_node_id);
-            new_node->isParent = true; // New nodes with samples are parents
+            new_node->isParent = true;
             new_node->A.parent_data.sample = src[j];
+            new_node->refCount = 0;
+            new_node->next_id = UINT16_MAX;
             if (prev_id != UINT16_MAX) {
                 get_node(prev_id)->next_id = new_node_id;
             } else {
                 track->head_id = new_node_id;
             }
             prev_id = new_node_id;
+
         }
     }
 }
@@ -250,7 +261,6 @@ bool tr_delete_range(struct sound_seg* track, size_t pos, size_t len) {
     uint16_t current_id = track->head_id;
     uint16_t prev_id = UINT16_MAX;
     size_t i = 0;
-
     while (current_id != UINT16_MAX && i < pos) {
         struct sound_seg_node* current = get_node(current_id);
         if (!current) return false;
@@ -258,20 +268,26 @@ bool tr_delete_range(struct sound_seg* track, size_t pos, size_t len) {
         current_id = current->next_id;
         i++;
     }
+    //current_id stops at the position we want to delete
     if (current_id == UINT16_MAX) return false;
 
     uint16_t check_id = current_id;
     for (size_t j = 0; j < len && check_id != UINT16_MAX; j++) {
         struct sound_seg_node* check = get_node(check_id);
         if (!check) break;
-        if (check->refCount > 0) return false; // Can’t delete nodes with children
+        if (check->isParent && check->refCount > 0) {
+            return false;
+        }
         check_id = check->next_id;
     }
-
     for (size_t j = 0; j < len && current_id != UINT16_MAX; j++) {
         struct sound_seg_node* current = get_node(current_id);
         if (!current) break;
         uint16_t next_id = current->next_id;
+        if (!current->isParent && current->A.child_data.parent_id != UINT16_MAX) {
+            struct sound_seg_node* parent = get_node(current->A.child_data.parent_id);
+            if (parent) parent->refCount--;
+        }
         free_node(current_id);
         current_id = next_id;
     }
@@ -287,7 +303,7 @@ double compute_cross_correlation(const int16_t* target, const int16_t* ad, size_
         sum_product += (double)target[i] * (double)ad[i];
         sum_ad_sq += (double)ad[i] * (double)ad[i];
     }
-    return sum_product / (sum_ad_sq + 1e-10); // Avoid division by zero
+    return sum_product / sum_ad_sq;
 }
 
 char* tr_identify(struct sound_seg* target, struct sound_seg* ad) {
@@ -357,8 +373,8 @@ void tr_insert(struct sound_seg* src_track, struct sound_seg* dest_track,
         src_current_id = src_current->next_id;
         i++;
     }
+    //Now src_current_id stops at the position we want to insert
     if (src_current_id == UINT16_MAX) return;
-
     uint16_t dest_current_id = dest_track->head_id;
     uint16_t dest_prev_id = UINT16_MAX;
     i = 0;
@@ -369,6 +385,7 @@ void tr_insert(struct sound_seg* src_track, struct sound_seg* dest_track,
         dest_current_id = dest_current->next_id;
         i++;
     }
+    //Now dest_current_id stops at the position we want to insert
 
     uint16_t insert_head_id = UINT16_MAX;
     uint16_t insert_tail_id = UINT16_MAX;
@@ -379,17 +396,11 @@ void tr_insert(struct sound_seg* src_track, struct sound_seg* dest_track,
         if (new_id == UINT16_MAX) return;
         struct sound_seg_node* new_node = get_node(new_id);
         struct sound_seg_node* parent_node = get_node(src_temp_id);
-        if (!parent_node) return;
-
         new_node->A.child_data.parent_id = src_temp_id;
+        new_node->next_id = UINT16_MAX;
         new_node->isParent = false;
-        if (!parent_node->isParent) {
-            parent_node->isParent = true;
-            parent_node->A.parent_data.sample = get_sample(src_temp_id); // Preserve ancestor sample
-            parent_node->A.child_data.parent_id = UINT16_MAX; // Clear old parent link
-        }
         parent_node->refCount++;
-
+        parent_node->isParent = true;
         if (insert_head_id == UINT16_MAX) {
             insert_head_id = insert_tail_id = new_id;
         } else {
