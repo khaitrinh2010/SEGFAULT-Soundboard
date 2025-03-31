@@ -7,8 +7,8 @@
 #define OFFSET 40
 #define OFFSET_TO_AUDIO_DATA 44
 #define MAX_NODES 65535
-struct sound_seg_node* node_pool[MAX_NODES] = {0};
-uint16_t node_count = 0;
+
+uint16_t node_count = 0; // This is like a unique id for each node
 
 #pragma pack(push, 1)
 struct sound_seg_node {
@@ -30,29 +30,44 @@ struct sound_seg {
     uint16_t head_id; // the id of the first node in the linked list
 };
 #pragma pack(pop)
+
+struct sound_seg_node* node_pool[MAX_NODES] = {0};
+
 uint16_t alloc_node() {
-    if (node_count >= MAX_NODES) return UINT16_MAX;
-    struct sound_seg_node* node = malloc(sizeof(struct sound_seg_node));
-    if (!node) return UINT16_MAX;
-    node_pool[node_count] = node;
-    return node_count++;
+    struct sound_seg_node *newly_created_node = (struct sound_seg_node*)malloc(sizeof(struct sound_seg_node));
+    if (!newly_created_node) {
+        return -1;
+    }
+    node_pool[node_count++] = newly_created_node;
+    return node_count;
 }
 
 void free_node(uint16_t id) {
-    if (id >= node_count || !node_pool[id]) return;
-    free(node_pool[id]);
+    struct sound_seg_node* node = node_pool[id];
+    if ( !node ) {
+        return;
+    };
+    free(node_pool[id]); //free the node
     node_pool[id] = NULL;
 }
 
 struct sound_seg_node* get_node(uint16_t id) {
-    return (id < node_count) ? node_pool[id] : NULL;
+    struct sound_seg_node* node = node_pool[id];
+    if (!node) {
+        return NULL;
+    }
+    return node;
 }
 
 int16_t get_sample(uint16_t node_id) {
     struct sound_seg_node* node = get_node(node_id);
     if (!node) return 0;
-    if (node->isParent) return node->A.parent_data.sample;
-    return get_sample(node->A.child_data.parent_id);
+    int16_t result = 0;
+    while (!node->isParent) {
+        node = get_node(node->A.child_data.parent_id);
+    }
+    result =  node->A.parent_data.sample;
+    return result;
 }
 
 void set_sample(uint16_t node_id, int16_t value) {
