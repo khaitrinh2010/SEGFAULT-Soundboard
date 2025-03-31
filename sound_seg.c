@@ -34,13 +34,15 @@ struct sound_seg {
 struct sound_seg_node* node_pool[MAX_NODES] = {0};
 
 uint16_t alloc_node() {
-    struct sound_seg_node *newly_created_node = (struct sound_seg_node*)malloc(sizeof(struct sound_seg_node));
-    if (!newly_created_node) {
-        return 65535;
-    }
-    node_pool[node_count] = newly_created_node;
-    uint16_t allocated_id = node_count;
-    node_count++;
+    if (node_count >= MAX_NODES) return UINT16_MAX;
+    struct sound_seg_node *new_node = (struct sound_seg_node*)malloc(sizeof(struct sound_seg_node));
+    if (!new_node) return UINT16_MAX;
+    new_node->isParent = false;
+    new_node->refCount = 0;
+    new_node->A.child_data.parent_id = UINT16_MAX;
+    new_node->next_id = UINT16_MAX;
+    node_pool[node_count] = new_node;
+    uint16_t allocated_id = node_count++;
     return allocated_id;
 }
 
