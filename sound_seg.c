@@ -26,7 +26,6 @@ struct sound_seg_node {
         unsigned reserved : 6;
     } flags;
 };
-
 struct sound_seg {
     uint16_t head_id;
 };
