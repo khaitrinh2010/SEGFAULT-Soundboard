@@ -79,7 +79,6 @@ void set_sample(uint16_t node_id, int16_t value) {
 void wav_load(const char* filename, int16_t* dest) {
     FILE *file = fopen(filename, "rb");
     if (file == NULL) {
-        printf("Error opening file\n");
         return;
     }
     fseek(file, OFFSET, SEEK_SET);
@@ -146,9 +145,9 @@ void tr_destroy(struct sound_seg* track) {
     uint16_t id = track->head_id;
     while (id != 65535) {
         struct sound_seg_node* node = get_node(id);
-        if (!node) break;
+        //if (!node) break;
         uint16_t next_id = node->next_id;
-        free_node(id);
+        if (node) free_node(id);
         id = next_id;
     }
     free(track);
@@ -172,7 +171,7 @@ void tr_read(struct sound_seg* track, int16_t* dest, size_t pos, size_t len) {
     size_t elements_have_passed = 0;
     while (id != 65535 && elements_have_passed < pos) {
         struct sound_seg_node* node = get_node(id);
-        if (!node) break;
+        if (!node) continue;
         id  = node->next_id;
         elements_have_passed++;
     }
@@ -193,7 +192,7 @@ void tr_write(struct sound_seg* track, const int16_t* src, size_t pos, size_t le
     size_t i = 0;
     while (current_id != UINT16_MAX && i < pos) {
         struct sound_seg_node* current = get_node(current_id);
-        if (!current) return;
+        if (!current) continue;
         prev_id = current_id;
         current_id = current->next_id;
         i++;
@@ -226,7 +225,7 @@ void tr_write(struct sound_seg* track, const int16_t* src, size_t pos, size_t le
     for (size_t j = 0; j < len; j++) {
         if (current_id != UINT16_MAX) {
             struct sound_seg_node* current = get_node(current_id);
-            if (!current) return;
+            if (!current) continue;
             set_sample(current_id, src[j]);
             prev_id = current_id;
             current_id = current->next_id;
