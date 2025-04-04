@@ -157,10 +157,20 @@ size_t tr_length(struct sound_seg* track) {
     size_t length = 0;
     uint16_t current_id = track->head_id;
     while (current_id != UINT16_MAX) {
-        length++;
         struct sound_seg_node* current = get_node(current_id);
-        if (!current) break;
-        current_id = current->next_id;
+        if (!current) {
+            while (current_id != UINT16_MAX) {
+                current_id += 1;
+                current = get_node(current_id);
+                if (current) break;
+            }
+        }
+        if (current) {
+            length++;
+            current_id = current->next_id;
+        } else {
+            break;
+        }
     }
     return length;
 }
