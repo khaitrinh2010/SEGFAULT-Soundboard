@@ -41,7 +41,6 @@ uint16_t alloc_node() {
     node_count++;
     return allocated_id;
 }
-
 void free_node(uint16_t id) {
     struct sound_seg_node* node = node_pool[id];
     if ( !node ) {
@@ -67,7 +66,6 @@ int16_t get_sample(uint16_t node_id) {
     result =  node->A.parent_data.sample;
     return result;
 }
-
 void set_sample(uint16_t node_id, int16_t value) {
     struct sound_seg_node* node = get_node(node_id);
     if (!node) return;
@@ -76,7 +74,6 @@ void set_sample(uint16_t node_id, int16_t value) {
     }
     node->A.parent_data.sample = value;
 }
-
 void wav_load(const char* filename, int16_t* dest) {
     FILE *file = fopen(filename, "rb");
     if (file == NULL) {
