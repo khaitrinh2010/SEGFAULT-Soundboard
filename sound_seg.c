@@ -171,16 +171,35 @@ void tr_read(struct sound_seg* track, int16_t* dest, size_t pos, size_t len) {
     size_t elements_have_passed = 0;
     while (id != 65535 && elements_have_passed < pos) {
         struct sound_seg_node* node = get_node(id);
-        if (!node) continue;
-        id  = node->next_id;
-        elements_have_passed++;
+        if (!node) {
+            while (id != UINT16_MAX) {
+                id += 1;
+                node = get_node(id);
+                if (node) break;
+            }
+        }
+        if (node) {
+            id = node->next_id;
+            elements_have_passed++;
+        } else {
+            break;
+        }
     }
-    //Now id stop at the elements we want to read
     for (size_t i = 0; i < len; i++) {
         struct sound_seg_node* current = get_node(id);
-        if (!current) break;
-        dest[i] = get_sample(id);
-        id  = current->next_id;
+        if (!current) {
+            while (id != UINT16_MAX) {
+                id += 1;
+                current = get_node(id);
+                if (current) break;
+            }
+        }
+        if (current) {
+            dest[i] = get_sample(id);
+            id = current->next_id;
+        } else {
+            break;
+        }
     }
 }
 
@@ -192,17 +211,26 @@ void tr_write(struct sound_seg* track, const int16_t* src, size_t pos, size_t le
     size_t i = 0;
     while (current_id != UINT16_MAX && i < pos) {
         struct sound_seg_node* current = get_node(current_id);
-        if (!current) continue;
-        prev_id = current_id;
-        current_id = current->next_id;
-        i++;
+        if (!current) {
+            while (current_id != UINT16_MAX) {
+                current_id += 1;
+                current = get_node(current_id);
+                if (current) break;
+            }
+        }
+        if (current) {
+            prev_id = current_id;
+            current_id = current->next_id;
+            i++;
+        } else {
+            break;
+        }
     }
     if (prev_id != UINT16_MAX) {
         start_of_linked_list = true;
     }
 
     if (i < pos) {
-    // cannot reach the position we want to write
         while (i < pos) {
             uint16_t new_node_id = alloc_node();
             if (new_node_id == UINT16_MAX) return;
@@ -218,24 +246,32 @@ void tr_write(struct sound_seg* track, const int16_t* src, size_t pos, size_t le
                 track->head_id = new_node_id;
             }
             prev_id = new_node_id;
-            i++;;
+            i++;
         }
     }
 
     for (size_t j = 0; j < len; j++) {
         if (current_id != UINT16_MAX) {
             struct sound_seg_node* current = get_node(current_id);
-            if (!current) continue;
-            set_sample(current_id, src[j]);
-            prev_id = current_id;
-            current_id = current->next_id;
+            if (!current) {
+                while (current_id != UINT16_MAX) {
+                    current_id += 1;
+                    current = get_node(current_id);
+                    if (current) break;
+                }
+            }
+            if (current) {
+                set_sample(current_id, src[j]);
+                prev_id = current_id;
+                current_id = current->next_id;
+            }
         }
         else { // have to create spaces for new nodes
             uint16_t new_node_id = alloc_node();
             if (new_node_id == UINT16_MAX) return;
             struct sound_seg_node* new_node = get_node(new_node_id);
             new_node->flags.isParent = 1;
-            new_node->flags.isAncestor = 1; // When creating new nodes, it is the ancestor
+            new_node->flags.isAncestor = 1;
             new_node->A.parent_data.sample = src[j];
             new_node->refCount = 0;
             new_node->next_id = UINT16_MAX;
@@ -245,7 +281,6 @@ void tr_write(struct sound_seg* track, const int16_t* src, size_t pos, size_t le
                 track->head_id = new_node_id;
             }
             prev_id = new_node_id;
-
         }
     }
 }
@@ -257,33 +292,62 @@ bool tr_delete_range(struct sound_seg* track, size_t pos, size_t len) {
     size_t i = 0;
     while (current_id != UINT16_MAX && i < pos) {
         struct sound_seg_node* current = get_node(current_id);
-        if (!current) return false;
-        prev_id = current_id;
-        current_id = current->next_id;
-        i++;
+        if (!current) {
+            while (current_id != UINT16_MAX) {
+                current_id += 1;
+                current = get_node(current_id);
+                if (current) break;
+            }
+        }
+        if (current) {
+            prev_id = current_id;
+            current_id = current->next_id;
+            i++;
+        } else {
+            return false;
+        }
     }
-    //current_id stops at the position we want to delete
     if (current_id == UINT16_MAX) return false;
 
     uint16_t check_id = current_id;
     for (size_t j = 0; j < len && check_id != UINT16_MAX; j++) {
         struct sound_seg_node* check = get_node(check_id);
-        if (!check) break;
-        if (check->flags.isParent && check->refCount > 0) {
-            return false;
+        if (!check) {
+            while (check_id != UINT16_MAX) {
+                check_id += 1;
+                check = get_node(check_id);
+                if (check) break;
+            }
         }
-        check_id = check->next_id;
+        if (check) {
+            if (check->flags.isParent && check->refCount > 0) {
+                return false;
+            }
+            check_id = check->next_id;
+        } else {
+            break;
+        }
     }
     for (size_t j = 0; j < len && current_id != UINT16_MAX; j++) {
         struct sound_seg_node* current = get_node(current_id);
-        if (!current) break;
-        uint16_t next_id = current->next_id;
-        if (!current->flags.isParent && current->A.child_data.parent_id != UINT16_MAX) {
-            struct sound_seg_node* parent = get_node(current->A.child_data.parent_id);
-            if (parent) parent->refCount--;
+        if (!current) {
+            while (current_id != UINT16_MAX) {
+                current_id += 1;
+                current = get_node(current_id);
+                if (current) break;
+            }
         }
-        free_node(current_id);
-        current_id = next_id;
+        if (current) {
+            uint16_t next_id = current->next_id;
+            if (!current->flags.isParent && current->A.child_data.parent_id != UINT16_MAX) {
+                struct sound_seg_node* parent = get_node(current->A.child_data.parent_id);
+                if (parent) parent->refCount--;
+            }
+            free_node(current_id);
+            current_id = next_id;
+        } else {
+            break;
+        }
     }
     if (prev_id != UINT16_MAX) get_node(prev_id)->next_id = current_id;
     else track->head_id = current_id;
