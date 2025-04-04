@@ -56,6 +56,7 @@ struct sound_seg_node* get_node(uint16_t id) {
     }
     return node;
 }
+
 int16_t get_sample(uint16_t node_id) {
     struct sound_seg_node* node = get_node(node_id);
     if (!node) return 0;
@@ -66,6 +67,7 @@ int16_t get_sample(uint16_t node_id) {
     result =  node->A.parent_data.sample;
     return result;
 }
+
 void set_sample(uint16_t node_id, int16_t value) {
     struct sound_seg_node* node = get_node(node_id);
     if (!node) return;
