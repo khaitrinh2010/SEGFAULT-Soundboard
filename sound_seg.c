@@ -352,7 +352,6 @@ void tr_insert(struct sound_seg* src_track, struct sound_seg* dest_track,
         struct sound_seg_node* src_temp = get_node(src_temp_id);
         if (src_temp) src_temp_id = src_temp->next_id;
     }
-
     if (insert_head_id != UINT16_MAX) {
         get_node(insert_tail_id)->next_id = dest_current_id;
         if (dest_prev_id != UINT16_MAX) get_node(dest_prev_id)->next_id = insert_head_id;
