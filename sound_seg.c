@@ -188,11 +188,9 @@ bool tr_delete_range(struct sound_seg* track, size_t pos, size_t len) {
             current_id = current->next_id;
             i++;
         } else {
-            return false;
+            break;
         }
     }
-    if (current_id == UINT16_MAX) return false;
-
     uint16_t check_id = current_id;
     for (size_t j = 0; j < len && check_id != UINT16_MAX; j++) {
         struct sound_seg_node* check = get_node(check_id);
