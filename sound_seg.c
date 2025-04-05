@@ -245,7 +245,6 @@ double compute_cross_correlation(const int16_t* target, const int16_t* ad, size_
     }
     return sum_product / sum_ad_sq;
 }
-
 char* tr_identify(struct sound_seg* target, struct sound_seg* ad) {
     char *empty = "";
     if (!target || !ad || tr_length(ad) > tr_length(target)) return empty;
