@@ -253,24 +253,12 @@ char* tr_identify(struct sound_seg* target, struct sound_seg* ad) {
     size_t ad_len = tr_length(ad);
     int16_t* target_data = malloc(target_len * sizeof(int16_t));
     int16_t* ad_data = malloc(ad_len * sizeof(int16_t));
-    if (!target_data || !ad_data) {
-        free(target_data);
-        free(ad_data);
-        return empty;
-    }
     tr_read(target, target_data, 0, target_len);
     tr_read(ad, ad_data, 0, ad_len);
-
     char* result = malloc(256);
-    if (!result) {
-        free(target_data);
-        free(ad_data);
-        return empty;
-    }
     size_t capacity = 256;
     size_t used = 0;
     result[0] = '\0';
-
     for (size_t i = 0; i <= target_len - ad_len; i++) {
         double corr = compute_cross_correlation(target_data + i, ad_data, ad_len);
         if (corr >= 0.95) {
@@ -299,7 +287,7 @@ char* tr_identify(struct sound_seg* target, struct sound_seg* ad) {
         free(result);
         return empty;
     }
-    if (used > 0 && result[used - 1] == '\n') result[used - 1] = '\0';
+    if (result[used - 1] == '\n') result[used - 1] = '\0';
     return result;
 }
 
