@@ -290,7 +290,6 @@ char* tr_identify(struct sound_seg* target, struct sound_seg* ad) {
     if (result[used - 1] == '\n') result[used - 1] = '\0';
     return result;
 }
-
 void tr_insert(struct sound_seg* src_track, struct sound_seg* dest_track,
                size_t destpos, size_t srcpos, size_t len) {
     if (!src_track || !dest_track || len == 0 || srcpos + len > tr_length(src_track)) return;
