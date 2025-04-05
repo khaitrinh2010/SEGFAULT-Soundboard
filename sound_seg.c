@@ -248,7 +248,8 @@ double compute_cross_correlation(const int16_t* target, const int16_t* ad, size_
 }
 
 char* tr_identify(struct sound_seg* target, struct sound_seg* ad) {
-    if (!target || !ad || tr_length(ad) > tr_length(target)) return strdup("");
+    char *empty = "";
+    if (!target || !ad || tr_length(ad) > tr_length(target)) return empty;
     size_t target_len = tr_length(target);
     size_t ad_len = tr_length(ad);
     int16_t* target_data = malloc(target_len * sizeof(int16_t));
@@ -256,7 +257,7 @@ char* tr_identify(struct sound_seg* target, struct sound_seg* ad) {
     if (!target_data || !ad_data) {
         free(target_data);
         free(ad_data);
-        return strdup("");
+        return empty;
     }
     tr_read(target, target_data, 0, target_len);
     tr_read(ad, ad_data, 0, ad_len);
@@ -265,7 +266,7 @@ char* tr_identify(struct sound_seg* target, struct sound_seg* ad) {
     if (!result) {
         free(target_data);
         free(ad_data);
-        return strdup("");
+        return empty;
     }
     size_t capacity = 256;
     size_t used = 0;
@@ -284,7 +285,7 @@ char* tr_identify(struct sound_seg* target, struct sound_seg* ad) {
                     free(result);
                     free(target_data);
                     free(ad_data);
-                    return strdup("");
+                    return empty;
                 }
                 result = new_result;
             }
@@ -297,7 +298,7 @@ char* tr_identify(struct sound_seg* target, struct sound_seg* ad) {
     free(ad_data);
     if (used == 0) {
         free(result);
-        return strdup("");
+        return empty;
     }
     if (used > 0 && result[used - 1] == '\n') result[used - 1] = '\0';
     return result;
