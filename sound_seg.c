@@ -222,9 +222,6 @@ bool tr_delete_range(struct sound_seg* track, size_t pos, size_t len) {
                 struct sound_seg_node* parent = get_node(current->A.child_data.parent_id);
                 if (parent) {
                     parent->refCount--;
-                    if (parent->refCount == 0) {
-                        parent->flags.isParent = 0;
-                    }
                 }
             }
             free_node(current_id);
