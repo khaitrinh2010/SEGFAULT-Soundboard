@@ -7,6 +7,7 @@
 #include "sound_seg.h"
 struct sound_seg_node* node_pool[MAX_NODES] = {0};
 uint16_t node_count = 0;
+
 struct sound_seg* tr_init(void) {
     struct sound_seg* track = malloc(sizeof(struct sound_seg));
     if (!track) {
@@ -185,7 +186,6 @@ void tr_write(struct sound_seg* track, const int16_t* src, size_t pos, size_t le
 }
 
 bool tr_delete_range(struct sound_seg* track, size_t pos, size_t len) {
-    // if (!track || len == 0 || pos >= tr_length(track)) return false;
     uint16_t current_id = track->head_id;
     uint16_t prev_id = LARGEST_ID;
     size_t i = 0;
@@ -195,9 +195,7 @@ bool tr_delete_range(struct sound_seg* track, size_t pos, size_t len) {
             while (current_id != LARGEST_ID) {
                 current_id += 1;
                 current = get_node(current_id);
-                if (current) {
-                    break;
-                }
+                if (current) break;
             }
         }
         if (current) {
@@ -209,16 +207,13 @@ bool tr_delete_range(struct sound_seg* track, size_t pos, size_t len) {
         }
     }
     uint16_t check_id = current_id;
-    //Check if the range to be deleted contains any parent nodes
     for (size_t j = 0; j < len && check_id != LARGEST_ID; j++) {
         struct sound_seg_node* check = get_node(check_id);
         if (!check) {
-            while (check_id != UINT16_MAX) {
+            while (check_id != LARGEST_ID) {
                 check_id += 1;
                 check = get_node(check_id);
-                if (check) {
-                    break;
-                }
+                if (check) break;
             }
         }
         if (check) {
@@ -230,28 +225,25 @@ bool tr_delete_range(struct sound_seg* track, size_t pos, size_t len) {
             break;
         }
     }
-    //Now we can delete anything we want after checking
     for (size_t j = 0; j < len && current_id != LARGEST_ID; j++) {
         struct sound_seg_node* current = get_node(current_id);
         if (!current) {
             while (current_id != LARGEST_ID) {
                 current_id += 1;
                 current = get_node(current_id);
-                if (current) {
-                    break;
-                };
+                if (current) break;
             }
         }
         if (current) {
             uint16_t next_id = current->next_id;
             if (!current->flags.isParent && current->A.child_data.parent_id != LARGEST_ID) {
                 struct sound_seg_node* parent = get_node(current->A.child_data.parent_id);
-                if (parent && parent->refCount > 0) {
+                if (parent) {
                     parent->refCount--;
                     if (parent->refCount == 0) {
                         parent->flags.isParent = 0;
                     }
-                };
+                }
             }
             free_node(current_id);
             current_id = next_id;
@@ -259,12 +251,8 @@ bool tr_delete_range(struct sound_seg* track, size_t pos, size_t len) {
             break;
         }
     }
-    if (prev_id != LARGEST_ID) {
-        get_node(prev_id)->next_id = current_id;
-    }
-    else {
-        track->head_id = current_id;
-    }
+    if (prev_id != LARGEST_ID) get_node(prev_id)->next_id = current_id;
+    else track->head_id = current_id;
     return true;
 }
 
