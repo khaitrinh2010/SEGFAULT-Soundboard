@@ -8,6 +8,7 @@
 #define OFFSET 40
 #define OFFSET_TO_AUDIO_DATA 44
 #define MAX_NODES 30000
+#define LARGEST_ID 65535
 
 // Struct declarations
 #pragma pack(push, 1)
@@ -25,7 +26,7 @@ struct sound_seg_node {
     struct {
         unsigned isAncestor : 1;
         unsigned isParent : 1;
-        unsigned reserved : 6;
+        unsigned dont_do_anything : 6;
     } flags;
 };
 
