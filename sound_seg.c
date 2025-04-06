@@ -20,7 +20,6 @@ void tr_destroy(struct sound_seg* track) {
     uint16_t id = track->head_id;
     while (id != LARGEST_ID) {
         struct sound_seg_node* node = get_node(id);
-        //if (!node) break;
         uint16_t next_id = node->next_id;
         if (node) free_node(id);
         id = next_id;
@@ -221,7 +220,12 @@ bool tr_delete_range(struct sound_seg* track, size_t pos, size_t len) {
             uint16_t next_id = current->next_id;
             if (!current->flags.isParent && current->A.child_data.parent_id != LARGEST_ID) {
                 struct sound_seg_node* parent = get_node(current->A.child_data.parent_id);
-                if (parent) parent->refCount--;
+                if (parent) {
+                    parent->refCount--;
+                    if (parent->refCount == 0) {
+                        parent->flags.isParent = 0;
+                    }
+                }
             }
             free_node(current_id);
             current_id = next_id;
