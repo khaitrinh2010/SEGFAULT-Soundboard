@@ -8,6 +8,7 @@
 struct sound_seg_node* node_pool[MAX_NODES] = {0};
 uint16_t node_count = 0;
 
+
 struct sound_seg* tr_init(void) {
     struct sound_seg* track = malloc(sizeof(struct sound_seg));
     if (!track) {
@@ -16,6 +17,7 @@ struct sound_seg* tr_init(void) {
     track->head_id = LARGEST_ID; //Initialize a track, no head yet, basically this head is serves as the end of the linked list, just like the '\0' in a string
     return track;
 }
+
 
 void tr_destroy(struct sound_seg* track) {
     if (!track) return;
@@ -40,7 +42,9 @@ size_t tr_length(struct sound_seg* track) {
             while (current_id != LARGEST_ID) {
                 current_id += 1;
                 current = get_node(current_id);
-                if (current) break;
+                if (current) {
+                    break;
+                }
             }
         }
         if (current) {
@@ -62,7 +66,9 @@ void tr_read(struct sound_seg* track, int16_t* dest, size_t pos, size_t len) {
             while (id != LARGEST_ID) {
                 id += 1;
                 node = get_node(id);
-                if (node) break;
+                if (node) {
+                    break;
+                }
             }
         }
         if (node) {
@@ -78,7 +84,9 @@ void tr_read(struct sound_seg* track, int16_t* dest, size_t pos, size_t len) {
             while (id != LARGEST_ID) {
                 id += 1;
                 current = get_node(id);
-                if (current) break;
+                if (current) {
+                    break;
+                }
             }
         }
         if (current) {
