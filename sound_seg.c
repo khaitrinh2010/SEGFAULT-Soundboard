@@ -10,7 +10,9 @@ uint16_t node_count = 0;
 
 struct sound_seg* tr_init(void) {
     struct sound_seg* track = malloc(sizeof(struct sound_seg));
-    if (!track) return NULL;
+    if (!track) {
+        return NULL;
+    }
     track->head_id = LARGEST_ID; //Initialize a track, no head yet, basically this head is serves as the end of the linked list, just like the '\0' in a string
     return track;
 }
@@ -21,7 +23,9 @@ void tr_destroy(struct sound_seg* track) {
     while (id != LARGEST_ID) {
         struct sound_seg_node* node = get_node(id);
         uint16_t next_id = node->next_id;
-        if (node) free_node(id);
+        if (node) {
+            free_node(id);
+        }
         id = next_id;
     }
     free(track);
@@ -97,7 +101,10 @@ void tr_write(struct sound_seg* track, const int16_t* src, size_t pos, size_t le
             while (current_id != LARGEST_ID) {
                 current_id += 1;
                 current = get_node(current_id);
-                if (current) break;
+                if (current) {
+                    break;
+                }
+
             }
         }
         if (current) {
@@ -139,7 +146,9 @@ void tr_write(struct sound_seg* track, const int16_t* src, size_t pos, size_t le
                 while (current_id != LARGEST_ID) {
                     current_id += 1;
                     current = get_node(current_id);
-                    if (current) break;
+                    if (current) {
+                        break;
+                    }
                 }
             }
             if (current) {
@@ -177,7 +186,9 @@ bool tr_delete_range(struct sound_seg* track, size_t pos, size_t len) {
             while (current_id != LARGEST_ID) {
                 current_id += 1;
                 current = get_node(current_id);
-                if (current) break;
+                if (current) {
+                    break;
+                }
             }
         }
         if (current) {
@@ -195,7 +206,9 @@ bool tr_delete_range(struct sound_seg* track, size_t pos, size_t len) {
             while (check_id != LARGEST_ID) {
                 check_id += 1;
                 check = get_node(check_id);
-                if (check) break;
+                if (check) {
+                    break;
+                }
             }
         }
         if (check) {
@@ -213,7 +226,9 @@ bool tr_delete_range(struct sound_seg* track, size_t pos, size_t len) {
             while (current_id != LARGEST_ID) {
                 current_id += 1;
                 current = get_node(current_id);
-                if (current) break;
+                if (current) {
+                    break;
+                }
             }
         }
         if (current) {
@@ -230,8 +245,12 @@ bool tr_delete_range(struct sound_seg* track, size_t pos, size_t len) {
             break;
         }
     }
-    if (prev_id != LARGEST_ID) get_node(prev_id)->next_id = current_id;
-    else track->head_id = current_id;
+    if (prev_id != LARGEST_ID) {
+        get_node(prev_id)->next_id = current_id;
+    }
+    else {
+        track->head_id = current_id;
+    }
     return true;
 }
 
@@ -285,7 +304,9 @@ char* tr_identify(struct sound_seg* target, struct sound_seg* ad) {
         free(result);
         return empty;
     }
-    if (result[used - 1] == '\n') result[used - 1] = '\0';
+    if (result[used - 1] == '\n') {
+        result[used - 1] = '\0';
+    }
     return result;
 }
 void tr_insert(struct sound_seg* src_track, struct sound_seg* dest_track,
@@ -298,10 +319,12 @@ void tr_insert(struct sound_seg* src_track, struct sound_seg* dest_track,
         src_current_id = src_current->next_id;
         i++;
     }
+
     if (src_current_id == LARGEST_ID) return;
     uint16_t dest_current_id = dest_track->head_id;
     uint16_t dest_prev_id = LARGEST_ID;
     i = 0;
+
     while (dest_current_id != LARGEST_ID && i < destpos) {
         struct sound_seg_node* dest_current = get_node(dest_current_id);
         if (!dest_current) return;
