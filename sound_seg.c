@@ -51,7 +51,6 @@ size_t tr_length(struct sound_seg* track) {
 }
 
 void tr_read(struct sound_seg* track, int16_t* dest, size_t pos, size_t len) {
-    if (!track || !dest || len == 0) return;
     uint16_t id = track->head_id;
     size_t elements_have_passed = 0;
     while (id != LARGEST_ID && elements_have_passed < pos) {
@@ -89,7 +88,6 @@ void tr_read(struct sound_seg* track, int16_t* dest, size_t pos, size_t len) {
 }
 
 void tr_write(struct sound_seg* track, const int16_t* src, size_t pos, size_t len) {
-    if (!track || !src || len == 0) return;
     uint16_t current_id = track->head_id;
     uint16_t prev_id = LARGEST_ID;
     bool start_of_linked_list = false;
@@ -171,7 +169,6 @@ void tr_write(struct sound_seg* track, const int16_t* src, size_t pos, size_t le
 }
 
 bool tr_delete_range(struct sound_seg* track, size_t pos, size_t len) {
-    if (!track || len == 0 || pos >= tr_length(track)) return false;
     uint16_t current_id = track->head_id;
     uint16_t prev_id = LARGEST_ID;
     size_t i = 0;
@@ -292,7 +289,6 @@ char* tr_identify(struct sound_seg* target, struct sound_seg* ad) {
 }
 void tr_insert(struct sound_seg* src_track, struct sound_seg* dest_track,
                size_t destpos, size_t srcpos, size_t len) {
-    if (!src_track || !dest_track || len == 0 || srcpos + len > tr_length(src_track)) return;
     uint16_t src_current_id = src_track->head_id;
     size_t i = 0;
     while (src_current_id != LARGEST_ID && i < srcpos) {
@@ -301,7 +297,6 @@ void tr_insert(struct sound_seg* src_track, struct sound_seg* dest_track,
         src_current_id = src_current->next_id;
         i++;
     }
-    //Now src_current_id stops at the position we want to insert
     if (src_current_id == LARGEST_ID) return;
     uint16_t dest_current_id = dest_track->head_id;
     uint16_t dest_prev_id = LARGEST_ID;
