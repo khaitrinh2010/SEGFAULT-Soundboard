@@ -220,7 +220,7 @@ bool tr_delete_range(struct sound_seg* track, size_t pos, size_t len) {
             }
         }
         if (check) {
-            if (check->refCount > 0) {
+            if (check->flags.isParent && check->refCount > 0) {
                 return false;
             }
             check_id = check->next_id;
