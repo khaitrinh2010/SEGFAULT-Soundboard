@@ -14,10 +14,9 @@ struct sound_seg* tr_init(void) {
     if (!track) {
         return NULL;
     }
-    track->head_id = LARGEST_ID; //Initialize a track, no head yet, basically this head is serves as the end of the linked list, just like the '\0' in a string
+    track->head_id = LARGEST_ID; //Initialize a track, no head yet, basically this head is serves as the end of the linked list, just like the '\0' in a string, so that is the intention of mine, using a linked list but not using the next ptr to reduce memory usage
     return track;
 }
-
 
 void tr_destroy(struct sound_seg* track) {
     if (!track) return;
@@ -130,10 +129,12 @@ void tr_write(struct sound_seg* track, const int16_t* src, size_t pos, size_t le
     if (i < pos) {
         while (i < pos) {
             uint16_t new_node_id = alloc_node();
-            if (new_node_id == LARGEST_ID) return;
+            if (new_node_id == LARGEST_ID) {
+                return;
+            }
             struct sound_seg_node* new_node = get_node(new_node_id);
             new_node->flags.isParent = 1;
-            new_node->flags.isAncestor = 1; // When creating new nodes, it is the ancestor
+            new_node->flags.isAncestor = 1;
             new_node->A.parent_data.sample = 0;
             new_node->refCount = 0;
             new_node->next_id = LARGEST_ID;
@@ -167,7 +168,9 @@ void tr_write(struct sound_seg* track, const int16_t* src, size_t pos, size_t le
         }
         else { // have to create spaces for new nodes
             uint16_t new_node_id = alloc_node();
-            if (new_node_id == LARGEST_ID) return;
+            if (new_node_id == LARGEST_ID) {
+                return;
+            }
             struct sound_seg_node* new_node = get_node(new_node_id);
             new_node->flags.isParent = 1;
             new_node->flags.isAncestor = 1;
@@ -263,60 +266,66 @@ bool tr_delete_range(struct sound_seg* track, size_t pos, size_t len) {
 }
 
 double compute_cross_correlation(const int16_t* target, const int16_t* ad, size_t len) {
-    double sum_product = 0.0;
-    double sum_ad_sq = 0.0;
+    double sum1 = 0.0;
+    double sum2 = 0.0;
     for (size_t i = 0; i < len; i++) {
-        sum_product += (double)target[i] * (double)ad[i];
-        sum_ad_sq += (double)ad[i] * (double)ad[i];
+        sum1 += (double)target[i] * (double)ad[i];
+        sum2 += (double)ad[i] * (double)ad[i];
     }
-    return sum_product / sum_ad_sq;
+    return sum1 / sum2;
 }
-char* tr_identify(struct sound_seg* target, struct sound_seg* ad) {
-    char *empty = "";
-    if (!target || !ad || tr_length(ad) > tr_length(target)) return empty;
-    size_t target_len = tr_length(target);
-    size_t ad_len = tr_length(ad);
-    int16_t* target_data = malloc(target_len * sizeof(int16_t));
-    int16_t* ad_data = malloc(ad_len * sizeof(int16_t));
-    tr_read(target, target_data, 0, target_len);
-    tr_read(ad, ad_data, 0, ad_len);
-    char* result = malloc(256);
-    size_t capacity = 256;
-    size_t used = 0;
-    result[0] = '\0';
-    for (size_t i = 0; i <= target_len - ad_len; i++) {
-        double corr = compute_cross_correlation(target_data + i, ad_data, ad_len);
-        if (corr >= 0.95) {
-            char temp[32];
-            snprintf(temp, sizeof(temp), "%zu,%zu\n", i, i + ad_len - 1);
-            size_t len = strlen(temp);
-            if (used + len + 1 > capacity) {
-                capacity *= 2;
-                char* new_result = realloc(result, capacity);
-                if (!new_result) {
-                    free(result);
-                    free(target_data);
-                    free(ad_data);
-                    return empty;
+char* tr_identify(struct sound_seg* track, struct sound_seg* ad) {
+    char* empty_result = "";
+    size_t samples_in_track = tr_length(track);
+    size_t samples_in_ad = tr_length(ad);
+    int16_t* track_samples = malloc(samples_in_track * sizeof(int16_t));
+    int16_t* ad_samples = malloc(samples_in_ad * sizeof(int16_t));
+    tr_read(track, track_samples, 0, samples_in_track);
+    tr_read(ad, ad_samples, 0, samples_in_ad);
+    char* result_string = malloc(256);
+    size_t result_capacity = 256;
+    size_t result_length = 0;
+    result_string[0] = '\0';
+    for (size_t start_index = 0; start_index <= samples_in_track - samples_in_ad; start_index++) {
+        int16_t* samples_in_track_to_check = track_samples + start_index;
+        double correlation = compute_cross_correlation(samples_in_track_to_check, ad_samples, samples_in_ad);
+        if (correlation >= 0.95) {
+            size_t match_start = start_index;
+            size_t match_end = start_index + samples_in_ad - 1;
+            char line[32];
+            sprintf(line, "%zu,%zu\n", match_start, match_end);
+            size_t line_length = strlen(line);
+            if (result_length + line_length + 1 > result_capacity) {
+                result_capacity *= 2;
+                char* new_result_string = realloc(result_string, result_capacity);
+                if (!new_result_string) {
+                    free(result_string);
+                    free(track_samples);
+                    free(ad_samples);
+                    return empty_result;
                 }
-                result = new_result;
+                result_string = new_result_string;
             }
-            strcpy(result + used, temp);
-            used += len;
-            i += ad_len - 1;
+
+            for (size_t i = 0; i < line_length; i++) {
+                result_string[result_length++] = line[i];
+            }
+            result_string[result_length] = '\0';
+            start_index += samples_in_ad - 1;
         }
     }
-    free(target_data);
-    free(ad_data);
-    if (used == 0) {
-        free(result);
-        return empty;
+    free(track_samples);
+    free(ad_samples);
+    if (result_length == 0) {
+        free(result_string);
+        return empty_result;
     }
-    if (result[used - 1] == '\n') {
-        result[used - 1] = '\0';
+    if (result_string[result_length - 1] == '\n') {
+        result_string[result_length - 1] = '\0';
     }
-    return result;
+    return result_string;
 }
+
 void tr_insert(struct sound_seg* src_track, struct sound_seg* dest_track,
                size_t destpos, size_t srcpos, size_t len) {
     uint16_t src_current_id = src_track->head_id;
@@ -327,7 +336,6 @@ void tr_insert(struct sound_seg* src_track, struct sound_seg* dest_track,
         src_current_id = src_current->next_id;
         i++;
     }
-
     if (src_current_id == LARGEST_ID) return;
     uint16_t dest_current_id = dest_track->head_id;
     uint16_t dest_prev_id = LARGEST_ID;
@@ -341,11 +349,9 @@ void tr_insert(struct sound_seg* src_track, struct sound_seg* dest_track,
         i++;
     }
     //Now dest_current_id stops at the position we want to insert
-
     uint16_t insert_head_id = LARGEST_ID;
     uint16_t insert_tail_id = LARGEST_ID;
     uint16_t src_temp_id = src_current_id;
-
     for (size_t j = 0; j < len && src_temp_id != LARGEST_ID; j++) {
         uint16_t new_id = alloc_node();
         if (new_id == LARGEST_ID) return;

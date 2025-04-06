@@ -7,29 +7,31 @@ uint16_t alloc_node() {
         return 65535;
     }
     node_pool[node_count] = newly_created_node;
-    uint16_t allocated_id = node_count;
+    uint16_t new_id = node_count;
     node_count++;
-    return allocated_id;
+    return new_id;
 }
 void free_node(uint16_t id) {
     struct sound_seg_node* node = node_pool[id];
-    if ( !node ) {
-        return;
+    if ( node ) {
+        free(node_pool[id]);
+    	node_pool[id] = NULL;
     };
-    free(node_pool[id]);
-    node_pool[id] = NULL;
 }
+
 struct sound_seg_node* get_node(uint16_t id) {
     struct sound_seg_node* node = node_pool[id];
-    if (!node) {
-        return NULL;
+    if (node) {
+        return node;
     }
-    return node;
+    return NULL;
 }
 
 int16_t get_sample(uint16_t node_id) {
     struct sound_seg_node* node = get_node(node_id);
-    if (!node) return 0;
+    if (!node) {
+        return 0;
+    }
     int16_t result = 0;
     while (!node->flags.isAncestor) {
         node = get_node(node->A.child_data.parent_id);
@@ -40,7 +42,9 @@ int16_t get_sample(uint16_t node_id) {
 
 void set_sample(uint16_t node_id, int16_t value) {
     struct sound_seg_node* node = get_node(node_id);
-    if (!node) return;
+    if (!node) {
+      	return;
+     }
     while (!node->flags.isAncestor) {
         node = get_node(node->A.child_data.parent_id);
     }

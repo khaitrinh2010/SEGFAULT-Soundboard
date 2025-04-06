@@ -19,7 +19,6 @@ void wav_load(const char* filename, int16_t* dest) {
 void wav_save(const char* fname, int16_t* src, size_t len) {
     FILE *file = fopen(fname, "wb");
     if (file == NULL) {
-        printf("Error opening file\n");
         return;
     }
     union wav_header {
@@ -40,7 +39,6 @@ void wav_save(const char* fname, int16_t* src, size_t len) {
         } fields;
         char bytes[OFFSET_TO_AUDIO_DATA];
     } header;
-
     memcpy(header.fields.riff, "RIFF", 4);
     header.fields.flength = len * sizeof(int16_t) + OFFSET_TO_AUDIO_DATA;
     memcpy(header.fields.wave, "WAVE", 4);
