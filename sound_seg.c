@@ -10,31 +10,19 @@ uint16_t node_count = 0;
 
 struct sound_seg* tr_init(void) {
     struct sound_seg* track = malloc(sizeof(struct sound_seg));
-    if (!track) {
-        return NULL;
-    };
+    if (!track) return NULL;
     track->head_id = LARGEST_ID; //Initialize a track, no head yet, basically this head is serves as the end of the linked list, just like the '\0' in a string
     return track;
 }
 
 void tr_destroy(struct sound_seg* track) {
+    if (!track) return;
     uint16_t id = track->head_id;
     while (id != LARGEST_ID) {
         struct sound_seg_node* node = get_node(id);
-        if (!node){
-            while (id != LARGEST_ID) {
-                id += 1;
-                node = get_node(id);
-                if (node) {
-                    break;
-                }
-            }
-        }
-        if (!node) {
-            break;
-        }
+        //if (!node) break;
         uint16_t next_id = node->next_id;
-        free_node(id);
+        if (node) free_node(id);
         id = next_id;
     }
     free(track);
@@ -49,9 +37,7 @@ size_t tr_length(struct sound_seg* track) {
             while (current_id != LARGEST_ID) {
                 current_id += 1;
                 current = get_node(current_id);
-                if (current) {
-                    break;
-                }
+                if (current) break;
             }
         }
         if (current) {
@@ -65,6 +51,7 @@ size_t tr_length(struct sound_seg* track) {
 }
 
 void tr_read(struct sound_seg* track, int16_t* dest, size_t pos, size_t len) {
+    if (!track || !dest || len == 0) return;
     uint16_t id = track->head_id;
     size_t elements_have_passed = 0;
     while (id != LARGEST_ID && elements_have_passed < pos) {
@@ -73,9 +60,7 @@ void tr_read(struct sound_seg* track, int16_t* dest, size_t pos, size_t len) {
             while (id != LARGEST_ID) {
                 id += 1;
                 node = get_node(id);
-                if (node) {
-                    break;
-                }
+                if (node) break;
             }
         }
         if (node) {
@@ -85,17 +70,13 @@ void tr_read(struct sound_seg* track, int16_t* dest, size_t pos, size_t len) {
             break;
         }
     }
-
-    //Now we have skipped to the place where we want to start reading
     for (size_t i = 0; i < len; i++) {
         struct sound_seg_node* current = get_node(id);
         if (!current) {
             while (id != LARGEST_ID) {
                 id += 1;
                 current = get_node(id);
-                if (current) {
-                    break;
-                };
+                if (current) break;
             }
         }
         if (current) {
@@ -190,6 +171,7 @@ void tr_write(struct sound_seg* track, const int16_t* src, size_t pos, size_t le
 }
 
 bool tr_delete_range(struct sound_seg* track, size_t pos, size_t len) {
+    if (!track || len == 0 || pos >= tr_length(track)) return false;
     uint16_t current_id = track->head_id;
     uint16_t prev_id = LARGEST_ID;
     size_t i = 0;
@@ -242,12 +224,7 @@ bool tr_delete_range(struct sound_seg* track, size_t pos, size_t len) {
             uint16_t next_id = current->next_id;
             if (!current->flags.isParent && current->A.child_data.parent_id != LARGEST_ID) {
                 struct sound_seg_node* parent = get_node(current->A.child_data.parent_id);
-                if (parent) {
-                    parent->refCount--;
-                    if (parent->refCount == 0) {
-                        parent->flags.isParent = 0;
-                    }
-                }
+                if (parent) parent->refCount--;
             }
             free_node(current_id);
             current_id = next_id;
@@ -310,9 +287,7 @@ char* tr_identify(struct sound_seg* target, struct sound_seg* ad) {
         free(result);
         return empty;
     }
-    if (result[used - 1] == '\n') {
-        result[used - 1] = '\0';
-    }
+    if (result[used - 1] == '\n') result[used - 1] = '\0';
     return result;
 }
 void tr_insert(struct sound_seg* src_track, struct sound_seg* dest_track,
