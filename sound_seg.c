@@ -317,25 +317,14 @@ char* tr_identify(struct sound_seg* target, struct sound_seg* ad) {
 }
 void tr_insert(struct sound_seg* src_track, struct sound_seg* dest_track,
                size_t destpos, size_t srcpos, size_t len) {
+    if (!src_track || !dest_track || len == 0 || srcpos + len > tr_length(src_track)) return;
     uint16_t src_current_id = src_track->head_id;
     size_t i = 0;
     while (src_current_id != LARGEST_ID && i < srcpos) {
         struct sound_seg_node* src_current = get_node(src_current_id);
-        if (!src_current) {
-            while (src_current_id != LARGEST_ID) {
-                src_current_id += 1;
-                src_current = get_node(src_current_id);
-                if (src_current) {
-                    break;
-                }
-            }
-        };
-        if (src_current) {
-            src_current_id = src_current->next_id;
-            i++;
-        } else {
-            break;
-        }
+        if (!src_current) return;
+        src_current_id = src_current->next_id;
+        i++;
     }
     //Now src_current_id stops at the position we want to insert
     if (src_current_id == LARGEST_ID) return;
@@ -344,24 +333,13 @@ void tr_insert(struct sound_seg* src_track, struct sound_seg* dest_track,
     i = 0;
     while (dest_current_id != LARGEST_ID && i < destpos) {
         struct sound_seg_node* dest_current = get_node(dest_current_id);
-        if (!dest_current) {
-            while (dest_current_id != LARGEST_ID) {
-                dest_current_id += 1;
-                dest_current = get_node(dest_current_id);
-                if (dest_current) {
-                    break;
-                }
-            }
-        }
-        if (dest_current) {
-            dest_prev_id = dest_current_id;
-            dest_current_id = dest_current->next_id;
-            i++;
-        } else {
-            break;
-        }
+        if (!dest_current) return;
+        dest_prev_id = dest_current_id;
+        dest_current_id = dest_current->next_id;
+        i++;
     }
     //Now dest_current_id stops at the position we want to insert
+
     uint16_t insert_head_id = LARGEST_ID;
     uint16_t insert_tail_id = LARGEST_ID;
     uint16_t src_temp_id = src_current_id;
@@ -375,37 +353,20 @@ void tr_insert(struct sound_seg* src_track, struct sound_seg* dest_track,
         new_node->next_id = LARGEST_ID;
         new_node->flags.isParent = 0;
         new_node->flags.isAncestor = 0;
-        parent_node->flags.isParent = 1;
         parent_node->refCount++;
+        parent_node->flags.isParent = 1;
         if (insert_head_id == LARGEST_ID) {
-            insert_head_id = new_id;
-            insert_tail_id = new_id;
-        }
-        else {
+            insert_head_id = insert_tail_id = new_id;
+        } else {
             get_node(insert_tail_id)->next_id = new_id;
             insert_tail_id = new_id;
         }
         struct sound_seg_node* src_temp = get_node(src_temp_id);
-        if (src_temp) {
-            src_temp_id = src_temp->next_id;
-        }
-        else {
-            while (src_temp_id != LARGEST_ID) {
-                src_temp_id += 1;
-                src_temp = get_node(src_temp_id);
-                if (src_temp) {
-                    break;
-                }
-            }
-        }
+        if (src_temp) src_temp_id = src_temp->next_id;
     }
     if (insert_head_id != LARGEST_ID) {
         get_node(insert_tail_id)->next_id = dest_current_id;
-        if (dest_prev_id != LARGEST_ID) {
-            get_node(dest_prev_id)->next_id = insert_head_id;
-        }
-        else {
-            dest_track->head_id = insert_head_id;
-        }
+        if (dest_prev_id != LARGEST_ID) get_node(dest_prev_id)->next_id = insert_head_id;
+        else dest_track->head_id = insert_head_id;
     }
 }
