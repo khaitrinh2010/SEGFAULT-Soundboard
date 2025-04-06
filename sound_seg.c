@@ -108,8 +108,10 @@ void tr_read(struct sound_seg* track, int16_t* dest, size_t pos, size_t len) {
 }
 
 void tr_write(struct sound_seg* track, const int16_t* src, size_t pos, size_t len) {
+    if (!track || !src || len == 0) return;
     uint16_t current_id = track->head_id;
     uint16_t prev_id = LARGEST_ID;
+    bool start_of_linked_list = false;
     size_t i = 0;
     while (current_id != LARGEST_ID && i < pos) {
         struct sound_seg_node* current = get_node(current_id);
@@ -117,9 +119,7 @@ void tr_write(struct sound_seg* track, const int16_t* src, size_t pos, size_t le
             while (current_id != LARGEST_ID) {
                 current_id += 1;
                 current = get_node(current_id);
-                if (current) {
-                    break;
-                };
+                if (current) break;
             }
         }
         if (current) {
@@ -130,17 +130,21 @@ void tr_write(struct sound_seg* track, const int16_t* src, size_t pos, size_t le
             break;
         }
     }
+    if (prev_id != LARGEST_ID) {
+        start_of_linked_list = true;
+    }
+
     if (i < pos) {
         while (i < pos) {
             uint16_t new_node_id = alloc_node();
             if (new_node_id == LARGEST_ID) return;
             struct sound_seg_node* new_node = get_node(new_node_id);
-            new_node->flags.isParent = 0;
-            new_node->flags.isAncestor = 1; //when creating new nodes, it is the ancestor
+            new_node->flags.isParent = 1;
+            new_node->flags.isAncestor = 1; // When creating new nodes, it is the ancestor
             new_node->A.parent_data.sample = 0;
             new_node->refCount = 0;
             new_node->next_id = LARGEST_ID;
-            if (prev_id != LARGEST_ID) {
+            if (start_of_linked_list) {
                 get_node(prev_id)->next_id = new_node_id;
             } else {
                 track->head_id = new_node_id;
@@ -170,7 +174,7 @@ void tr_write(struct sound_seg* track, const int16_t* src, size_t pos, size_t le
             uint16_t new_node_id = alloc_node();
             if (new_node_id == LARGEST_ID) return;
             struct sound_seg_node* new_node = get_node(new_node_id);
-            new_node->flags.isParent = 0;
+            new_node->flags.isParent = 1;
             new_node->flags.isAncestor = 1;
             new_node->A.parent_data.sample = src[j];
             new_node->refCount = 0;
