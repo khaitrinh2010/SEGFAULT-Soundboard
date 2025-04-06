@@ -220,7 +220,7 @@ bool tr_delete_range(struct sound_seg* track, size_t pos, size_t len) {
             }
         }
         if (check) {
-            if (check->flags.isParent && check->refCount > 0) {
+            if (check->refCount > 0) {
                 return false;
             }
             check_id = check->next_id;
@@ -364,11 +364,17 @@ void tr_insert(struct sound_seg* src_track, struct sound_seg* dest_track,
             insert_tail_id = new_id;
         }
         struct sound_seg_node* src_temp = get_node(src_temp_id);
-        if (src_temp) src_temp_id = src_temp->next_id;
+        if (src_temp) {
+            src_temp_id = src_temp->next_id;
+        }
     }
     if (insert_head_id != LARGEST_ID) {
         get_node(insert_tail_id)->next_id = dest_current_id;
-        if (dest_prev_id != LARGEST_ID) get_node(dest_prev_id)->next_id = insert_head_id;
-        else dest_track->head_id = insert_head_id;
+        if (dest_prev_id != LARGEST_ID) {
+            get_node(dest_prev_id)->next_id = insert_head_id;
+        }
+        else {
+            dest_track->head_id = insert_head_id;
+        }
     }
 }
