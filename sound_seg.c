@@ -5,8 +5,7 @@
 #include <string.h>
 #include <stdio.h>
 #include "sound_seg.h"
-struct sound_seg_node* node_pool[MAX_NODES] = {0};
-uint16_t node_count = 0;
+#include "node_management.h"
 
 
 struct sound_seg* tr_init(void) {

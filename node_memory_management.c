@@ -1,5 +1,8 @@
-#include "sound_seg.h"
+#include "node_management.h"
 #include <stdlib.h>
+
+struct sound_seg_node* node_pool[MAX_NODES] = {0};
+uint16_t node_count = 0;
 
 uint16_t alloc_node() {
     struct sound_seg_node *newly_created_node = (struct sound_seg_node*)malloc(sizeof(struct sound_seg_node));
