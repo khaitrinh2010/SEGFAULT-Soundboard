@@ -298,13 +298,9 @@ char* tr_identify(struct sound_seg* track, struct sound_seg* ad) {
             if (result_length + line_length + 1 > result_capacity) {
                 result_capacity *= 2;
                 char* new_result_string = realloc(result_string, result_capacity);
-                if (!new_result_string) {
-                    free(result_string);
-                    free(track_samples);
-                    free(ad_samples);
-                    return empty_result;
+                if (new_result_string) {
+                    result_string = new_result_string;
                 }
-                result_string = new_result_string;
             }
 
             for (size_t i = 0; i < line_length; i++) {
@@ -332,18 +328,24 @@ void tr_insert(struct sound_seg* src_track, struct sound_seg* dest_track,
     size_t i = 0;
     while (src_current_id != LARGEST_ID && i < srcpos) {
         struct sound_seg_node* src_current = get_node(src_current_id);
-        if (!src_current) return;
+        if (!src_current) {
+            return;
+        }
         src_current_id = src_current->next_id;
         i++;
     }
-    if (src_current_id == LARGEST_ID) return;
+    if (src_current_id == LARGEST_ID) {
+        return;
+    }
     uint16_t dest_current_id = dest_track->head_id;
     uint16_t dest_prev_id = LARGEST_ID;
     i = 0;
 
     while (dest_current_id != LARGEST_ID && i < destpos) {
         struct sound_seg_node* dest_current = get_node(dest_current_id);
-        if (!dest_current) return;
+        if (!dest_current) {
+            return;
+        }
         dest_prev_id = dest_current_id;
         dest_current_id = dest_current->next_id;
         i++;
@@ -354,7 +356,9 @@ void tr_insert(struct sound_seg* src_track, struct sound_seg* dest_track,
     uint16_t src_temp_id = src_current_id;
     for (size_t j = 0; j < len && src_temp_id != LARGEST_ID; j++) {
         uint16_t new_id = alloc_node();
-        if (new_id == LARGEST_ID) return;
+        if (new_id == LARGEST_ID) {
+            return;
+        }
         struct sound_seg_node* new_node = get_node(new_id);
         struct sound_seg_node* parent_node = get_node(src_temp_id);
         new_node->A.child_data.parent_id = src_temp_id;
