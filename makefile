@@ -8,10 +8,10 @@ all: $(TARGET)
 sound_seg_tmp.o: sound_seg.c sound_seg.h node_management.h
 	$(CC) $(CFLAGS) -c sound_seg.c -o sound_seg_tmp.o
 
-wav_io.o: wav_io.c wav_io.h
+wav_io.o: sound_seg_io.c file_io.h
 	$(CC) $(CFLAGS) -c wav_io.c -o wav_io.o
 
-node_management.o: node_management.c node_management.h
+node_management.o: node_memory_management.c node_management.h
 	$(CC) $(CFLAGS) -c node_management.c -o node_management.o
 
 $(TARGET): $(OBJS)
