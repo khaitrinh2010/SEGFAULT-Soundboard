@@ -5,8 +5,6 @@
 #include <string.h>
 #include <stdio.h>
 #include "sound_seg.h"
-#include "node_management.h"
-
 
 struct sound_seg* tr_init(void) {
     struct sound_seg* track = malloc(sizeof(struct sound_seg));
