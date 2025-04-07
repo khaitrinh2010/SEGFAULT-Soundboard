@@ -5,7 +5,6 @@ SRCS = sound_seg.c sound_seg_io.c node_memory_management.c
 OBJS = sound_seg_tmp.o sound_seg_io.o node_memory_management.o
 TARGET = sound_seg.o
 all: $(TARGET)
-
 sound_seg_tmp.o: sound_seg.c
 	$(CC) $(CFLAGS) -c sound_seg.c -o sound_seg_tmp.o
 sound_seg_io.o: sound_seg_io.c
