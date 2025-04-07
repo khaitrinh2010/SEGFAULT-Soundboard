@@ -3,7 +3,7 @@ LD = ld
 
 CFLAGS = -Wall -Wextra -Werror -Wvla -std=c99 -fPIC -fsanitize=address -g
 
-SRCS = sound_seg.c sound_seg_io.c node_management.c
+SRCS = sound_seg.c sound_seg_io.c node_memory_management.c
 OBJS = sound_seg_tmp.o sound_seg_io.o node_management.o
 TARGET = sound_seg.o
 
