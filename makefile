@@ -1,10 +1,13 @@
 CC = gcc
 CFLAGS = -Wall -Wextra -std=c11 -fPIC -Werror -Wvla -fsanitize=address -g
-REQ_OBJ = sound_seg.o
 SRCS = sound_seg.c sound_seg_io.c node_memory_management.c
 OBJS = $(SRCS:.c=.o)
-$(REQ_OBJ): $(SRCS) sound_seg.h
-	$(CC) $(CFLAGS) -c combination.c -o $(REQ_OBJ)
+REQ_OBJ = sound_seg.o
+$(REQ_OBJ): $(OBJS)
+	$(CC) $(CFLAGS) -o $(REQ_OBJ) -c sound_seg.c
+%.o: %.c
+	$(CC) $(CFLAGS) -c $< -o $@
+
+.PHONY: clean
 clean:
 	rm -f *.o
-
