@@ -16,7 +16,7 @@ sound_seg_io.o: sound_seg_io.c file_io.h
 	$(CC) $(CFLAGS) -c sound_seg_io.c -o sound_seg_io.o
 
 node_management.o: node_memory_management.c node_management.h
-	$(CC) $(CFLAGS) -c node_management.c -o node_management.o
+	$(CC) $(CFLAGS) -c node_memory_management.c -o node_management.o
 
 $(TARGET): $(OBJS)
 	$(LD) -r $(OBJS) -o $(TARGET)
