@@ -18,7 +18,6 @@ void free_node(uint16_t id) {
     	node_pool[id] = NULL;
     };
 }
-
 struct sound_seg_node* get_node(uint16_t id) {
     struct sound_seg_node* node = node_pool[id];
     if (node) {
