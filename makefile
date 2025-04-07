@@ -16,6 +16,7 @@ node_management.o: node_memory_management.c node_management.h
 
 $(TARGET): $(OBJS)
 	$(LD) -r $(OBJS) -o $(TARGET)
+
 .PHONY: clean
 clean:
 	rm -f *.o
