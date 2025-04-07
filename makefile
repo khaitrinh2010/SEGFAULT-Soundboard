@@ -1,6 +1,6 @@
 CC = gcc
 LD = ld
-CFLAGS = -Wall -Wextra -Werror -Wvla -std=c11 -fPIC -fsanitize=address -g
+CFLAGS = -Wall -Wextra -Werror -Wvla -std=c99 -fPIC -fsanitize=address -g
 SRCS = sound_seg.c sound_seg_io.c node_memory_management.c
 OBJS = sound_seg_tmp.o sound_seg_io.o node_memory_management.o
 TARGET = sound_seg.o
@@ -15,5 +15,6 @@ node_memory_management.o: node_memory_management.c
 $(TARGET): $(OBJS)
 	$(LD) -r $(OBJS) -o $(TARGET)
 .PHONY: clean
+
 clean:
 	rm -f *.o
