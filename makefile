@@ -17,6 +17,5 @@ $(TARGET): $(OBJS)
 test: main.c sound_seg.o
 	$(CC) $(CFLAGS) main.c sound_seg.o -o test_program
 .PHONY: clean
-
 clean:
 	rm -f *.o
