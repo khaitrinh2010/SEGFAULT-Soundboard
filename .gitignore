@@ -1,0 +1,5 @@
+*.h
+*.o
+*.zip
+test_program
+SEED

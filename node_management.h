@@ -33,6 +33,8 @@ struct sound_seg {
 
 extern struct sound_seg_node* node_pool[MAX_NODES];
 extern uint16_t node_count;
+extern struct sound_seg_node* node_pool[MAX_NODES];
+extern uint16_t node_count;
 
 uint16_t alloc_node(void);
 void free_node(uint16_t id);
